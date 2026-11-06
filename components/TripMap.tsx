@@ -1,0 +1,901 @@
+"use client";
+
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import L from "leaflet";
+import {
+  Circle,
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import {
+  ClickHandler,
+  MapBridge,
+  PlaceMarker,
+  homeIcon,
+  stopIcon,
+  type StopState,
+} from "@/components/MapParts";
+import NavigationCard from "@/components/NavigationCard";
+import TripPanel from "@/components/TripPanel";
+import { playAlarm, prepareAlarm } from "@/lib/alarm";
+import { distanceMeters } from "@/lib/geo";
+import { CATEGORIES, findPlaces, prettify, type Category } from "@/lib/overpass";
+import { loadPlan, savePlan } from "@/lib/plan";
+import {
+  TRIP_BONUS,
+  getLevel,
+  loadProgress,
+  pointsForLeg,
+  saveProgress,
+  type Progress,
+} from "@/lib/rank";
+import { formatDistance, getRoute, type RouteResult, type TravelMode } from "@/lib/routing";
+import { computeSchedule, secondsNow, toSeconds, type Schedule } from "@/lib/schedule";
+import type { Place } from "@/lib/types";
+
+type NominatimResult = {
+  place_id: number;
+  name: string;
+  type: string;
+  display_name: string;
+  lat: string;
+  lon: string;
+};
+
+type RouteState = { key: string; data: RouteResult | null; failed: boolean };
+type LegState = { key: string; group: string; data: RouteResult | null };
+type UserPosition = { lat: number; lon: number; accuracy: number };
+type Reward = { text: string; levelUp?: string };
+
+// Values the GPS callback and the alarm need to read at any time
+type TripRun = {
+  stops: Place[];
+  home: Place | null;
+  schedule: Schedule | null;
+  position: { lat: number; lon: number } | null;
+  index: number;
+  mode: TravelMode;
+  legStart: { lat: number; lon: number } | null; // where the current leg began
+  skipped: number;
+  tripPoints: number;
+  alarmed: Set<string>;
+};
+
+// How close (in metres) you must be to a stop for it to count as reached
+const ARRIVE_METERS = 40;
+// If you are further than this from the place you should leave, you already left
+const LEAVE_RADIUS_METERS = 200;
+
+// Finds a readable name for a point on the map
+async function lookupAddress(lat: number, lon: number) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat=${lat}&lon=${lon}`
+    );
+    const data: { name?: string; display_name?: string } = await res.json();
+    if (!data.display_name) return null;
+    return {
+      name: data.name || data.display_name.split(",").slice(0, 2).join(","),
+      address: data.display_name,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export default function TripMap() {
+  const [initial] = useState(loadPlan);
+
+  const [map, setMap] = useState<L.Map | null>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Place[]>([]); // from the search bar
+  const [found, setFound] = useState<Place[]>([]); // from the category buttons
+  const [dropped, setDropped] = useState<Place | null>(null); // pin dropped by clicking the map
+  const [selected, setSelected] = useState<Place | null>(null);
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("Tip: click anywhere on the map to drop a pin.");
+
+  // The plan (saved in this browser)
+  const [home, setHome] = useState<Place | null>(initial.home);
+  const [trip, setTrip] = useState<Place[]>(initial.trip);
+  const [startTime, setStartTime] = useState(initial.startTime);
+  const [mode, setMode] = useState<TravelMode>(initial.mode);
+  const [showRoute, setShowRoute] = useState(true);
+  const [routeState, setRouteState] = useState<RouteState | null>(null);
+
+  // Live trip (GPS)
+  const [navigating, setNavigating] = useState(false);
+  const [tripDone, setTripDone] = useState(false);
+  const [navIndex, setNavIndex] = useState(0);
+  const [position, setPosition] = useState<UserPosition | null>(null);
+  const [gpsError, setGpsError] = useState("");
+  const [legState, setLegState] = useState<LegState | null>(null);
+  const [arrivals, setArrivals] = useState<Record<string, number>>({});
+  const [alarm, setAlarm] = useState<string | null>(null);
+
+  // Points and ranks
+  const [progress, setProgress] = useState<Progress>(loadProgress);
+  const [tripPoints, setTripPoints] = useState(0);
+  const [reward, setReward] = useState<Reward | null>(null);
+
+  const droppedRef = useRef<L.Marker>(null);
+  const droppedId = dropped?.id;
+
+  const watchId = useRef<number | null>(null);
+  const fittedFor = useRef(-1);
+  const rewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressRef = useRef<Progress>(progress);
+  const latest = useRef<TripRun>({
+    stops: [],
+    home: null,
+    schedule: null,
+    position: null,
+    index: 0,
+    mode: "foot",
+    legStart: null,
+    skipped: 0,
+    tripPoints: 0,
+    alarmed: new Set(),
+  });
+
+  // Open the popup of a freshly dropped pin
+  useEffect(() => {
+    if (droppedId) droppedRef.current?.openPopup();
+  }, [droppedId]);
+
+  // Move the map when a search result is selected
+  useEffect(() => {
+    if (map && selected) map.flyTo([selected.lat, selected.lon], 15);
+  }, [map, selected]);
+
+  // Save the plan and the points in this browser
+  useEffect(() => {
+    savePlan({ home, trip, startTime, mode });
+  }, [home, trip, startTime, mode]);
+
+  useEffect(() => {
+    saveProgress(progress);
+  }, [progress]);
+
+  const stops = trip;
+  const tripIds = new Set(trip.map((p) => p.id));
+
+  // ---- Route: start point (if any) and all stops, in order ----
+  const points = home ? [home, ...stops] : stops;
+  const routeKey = points.map((p) => `${p.id}:${p.lat},${p.lon}`).join("|");
+  const wantedKey = points.length >= 2 ? `${mode}|${routeKey}` : "";
+  const currentRoute = routeState && routeState.key === wantedKey ? routeState : null;
+  const route = currentRoute?.data ?? null;
+  const routeError = currentRoute?.failed ?? false;
+  const routeLoading = wantedKey !== "" && !currentRoute;
+
+  useEffect(() => {
+    if (!wantedKey) return;
+    let cancelled = false;
+    // Short delay so quick changes do not send many requests
+    const timer = setTimeout(async () => {
+      let state: RouteState;
+      try {
+        state = { key: wantedKey, data: await getRoute(points, mode), failed: false };
+      } catch {
+        state = { key: wantedKey, data: null, failed: true };
+      }
+      if (!cancelled) setRouteState(state);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedKey]);
+
+  // Zoom the map so the whole route is visible
+  useEffect(() => {
+    if (map && route && route.path.length > 1) {
+      map.fitBounds(route.path, { padding: [60, 60] });
+    }
+  }, [map, route]);
+
+  // ---- Timing of the whole trip ----
+  const schedule: Schedule | null =
+    stops.length > 0 && (points.length < 2 || route)
+      ? computeSchedule({
+          stops,
+          hasHome: home !== null,
+          legSeconds: route ? route.legs.map((l) => l.duration) : [],
+          startAt: toSeconds(startTime) ?? 0,
+          arrivals,
+        })
+      : null;
+  const canStart = schedule !== null;
+
+  // Keep the latest values available for the GPS callback and the alarm
+  useEffect(() => {
+    latest.current.stops = stops;
+    latest.current.home = home;
+    latest.current.schedule = schedule;
+    latest.current.position = position;
+    latest.current.mode = mode;
+    progressRef.current = progress;
+  });
+
+  // ---- Live trip: route from your position to the current stop ----
+  const target = navigating ? stops[navIndex] : undefined;
+  const legGroup = target ? `${mode}|${navIndex}|${target.id}` : "";
+  const legKey =
+    navigating && position && target
+      ? `${legGroup}|${position.lat.toFixed(3)},${position.lon.toFixed(3)}`
+      : "";
+  const liveLeg = navigating && legState && legState.group === legGroup ? legState.data : null;
+
+  useEffect(() => {
+    if (!legKey || !position || !target) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      let data: RouteResult | null = null;
+      try {
+        data = await getRoute([position, target], mode, true);
+      } catch {
+        data = null;
+      }
+      if (!cancelled) setLegState({ key: legKey, group: legGroup, data });
+    }, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legKey]);
+
+  // Zoom to you and the current stop once per stop
+  useEffect(() => {
+    if (map && navigating && position && target && fittedFor.current !== navIndex) {
+      fittedFor.current = navIndex;
+      map.fitBounds(
+        [
+          [position.lat, position.lon],
+          [target.lat, target.lon],
+        ],
+        { padding: [100, 100], maxZoom: 17 }
+      );
+    }
+  }, [map, navigating, position, target, navIndex]);
+
+  // Alarm: check every second while a trip is running
+  useEffect(() => {
+    if (!navigating) return;
+    const timer = setInterval(checkAlarm, 1000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigating]);
+
+  // Next turn: the first step after "depart" in the latest route
+  const nextStep = liveLeg?.steps[1];
+  let instruction: string | null = null;
+  if (nextStep && position) {
+    instruction =
+      nextStep.text === "You have arrived"
+        ? "Your stop is just ahead"
+        : `In ${formatDistance(distanceMeters(position, nextStep))}: ${nextStep.text}`;
+  }
+
+  // What the trip card shows about leaving and arriving
+  const prevPoint = navIndex === 0 ? home : stops[navIndex - 1];
+  const item = navigating ? schedule?.items[navIndex] : undefined;
+  const stillAtPrev =
+    !position || !prevPoint || distanceMeters(position, prevPoint) <= LEAVE_RADIUS_METERS;
+  const leaveAt = item && item.leaveAt !== null && stillAtPrev ? item.leaveAt : null;
+
+  // ---- Plan actions ----
+  function addToTrip(place: Place) {
+    setTrip((t) => (t.some((p) => p.id === place.id) ? t : [...t, place]));
+  }
+
+  function removeFromTrip(id: string) {
+    setTrip((t) => t.filter((p) => p.id !== id));
+  }
+
+  function updateStop(id: string, patch: Partial<Place>) {
+    setTrip((t) => t.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  function moveStop(id: string, direction: -1 | 1) {
+    setTrip((t) => {
+      const i = t.findIndex((p) => p.id === id);
+      const j = i + direction;
+      if (i < 0 || j < 0 || j >= t.length) return t;
+      const copy = [...t];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  }
+
+  function setStart(place: Place) {
+    setHome({ ...place, id: `home-${place.id}`, category: "Start" });
+    setMessage(`Start point set: ${place.name}`);
+  }
+
+  function setStartToMyLocation() {
+    if (!navigator.geolocation) {
+      setMessage("Your browser does not support GPS.");
+      return;
+    }
+    setMessage("Finding your location...");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const id = `home-${Date.now()}`;
+        setHome({ id, name: "My location", category: "Start", lat, lon });
+        setMessage("Start point set to your location.");
+        map?.flyTo([lat, lon], 15);
+        const info = await lookupAddress(lat, lon);
+        if (info) {
+          setHome((h) => (h && h.id === id ? { ...h, name: info.name, address: info.address } : h));
+        }
+      },
+      () => setMessage("Could not get your location. Allow location access and try again."),
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
+
+  // ---- Alarm ----
+  function checkAlarm() {
+    const run = latest.current;
+    const next = run.schedule?.items[run.index];
+    const stop = run.stops[run.index];
+    if (!next || !stop || next.leaveAt === null) return;
+    if (run.alarmed.has(stop.id)) return;
+    if (secondsNow() < next.leaveAt) return;
+
+    run.alarmed.add(stop.id);
+
+    // No alarm if you already left the previous place
+    const from = run.index === 0 ? run.home : run.stops[run.index - 1];
+    if (run.position && from && distanceMeters(run.position, from) > LEAVE_RADIUS_METERS) return;
+
+    const text = `Time to leave for ${stop.name}`;
+    playAlarm(text);
+    setAlarm(text);
+  }
+
+  // ---- GPS trip ----
+  function stopWatching() {
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+  }
+
+  function showReward(text: string, levelUp?: string) {
+    setReward({ text, levelUp });
+    if (rewardTimer.current) clearTimeout(rewardTimer.current);
+    rewardTimer.current = setTimeout(() => setReward(null), 6000);
+  }
+
+  function finishTrip() {
+    stopWatching();
+    setNavigating(false);
+    setTripDone(true);
+  }
+
+  function stopTrip() {
+    stopWatching();
+    setNavigating(false);
+    setTripDone(false);
+    setGpsError("");
+    setPosition(null);
+    setArrivals({});
+    setAlarm(null);
+  }
+
+  // Move on to the next stop. "reached" is set when you really arrived, not when you skip.
+  function goToNextStop(reached?: { stop: Place; here: { lat: number; lon: number } }) {
+    const run = latest.current;
+    const isLast = run.index + 1 >= run.stops.length;
+
+    let earned = 0;
+    let walked = 0;
+    if (reached) {
+      // Points depend on how far you travelled for this leg and how you travelled
+      const legMeters = run.legStart ? distanceMeters(run.legStart, reached.stop) : 0;
+      earned = pointsForLeg(legMeters, run.mode);
+      if (earned > 0 && run.mode === "foot") walked = legMeters;
+      run.legStart = reached.here;
+
+      // Remember the real arrival time, so the rest of the plan follows it
+      setArrivals((a) => ({ ...a, [reached.stop.id]: secondsNow() }));
+      setAlarm(null);
+    } else {
+      run.skipped += 1;
+      run.legStart = null; // the next leg starts at your next GPS position
+    }
+
+    // Bonus for finishing a trip without skipping any stop
+    const tripBonus = reached && isLast && run.skipped === 0 ? TRIP_BONUS : 0;
+    const total = earned + tripBonus;
+
+    if (reached) {
+      const before = progressRef.current;
+      const after: Progress = {
+        points: before.points + total,
+        stops: before.stops + 1,
+        trips: before.trips + (tripBonus > 0 ? 1 : 0),
+        walkedMeters: before.walkedMeters + walked,
+      };
+      progressRef.current = after;
+      setProgress(after);
+
+      run.tripPoints += total;
+      setTripPoints(run.tripPoints);
+
+      let text =
+        earned > 0
+          ? `+${earned} points at ${reached.stop.name}!`
+          : `Reached ${reached.stop.name}. Too close to your last point to earn points.`;
+      if (tripBonus > 0) text += ` Trip bonus +${tripBonus}!`;
+
+      const levelBefore = getLevel(before.points);
+      const levelAfter = getLevel(after.points);
+      showReward(
+        text,
+        levelAfter.level > levelBefore.level
+          ? `Level up! Level ${levelAfter.level}: ${levelAfter.rank.emoji} ${levelAfter.rank.name}`
+          : undefined
+      );
+    }
+
+    if (isLast) {
+      finishTrip();
+      return;
+    }
+    run.index += 1;
+    setNavIndex(run.index);
+  }
+
+  function startTrip() {
+    if (!canStart) return;
+
+    // Needed so the browser allows sound and notifications later
+    prepareAlarm();
+
+    stopWatching();
+    const run = latest.current;
+    run.index = 0;
+    run.legStart = null; // set by the first GPS position
+    run.skipped = 0;
+    run.tripPoints = 0;
+    run.alarmed.clear();
+    fittedFor.current = -1;
+    setNavIndex(0);
+    setPosition(null);
+    setLegState(null);
+    setGpsError("");
+    setTripPoints(0);
+    setReward(null);
+    setAlarm(null);
+    setArrivals({});
+    setTripDone(false);
+    setNavigating(true);
+
+    if (!navigator.geolocation) {
+      setGpsError("Your browser does not support GPS.");
+      return;
+    }
+
+    watchId.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const here = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
+        setPosition(here);
+        setGpsError("");
+
+        const current = latest.current;
+        if (!current.legStart) current.legStart = { lat: here.lat, lon: here.lon };
+
+        const stop = current.stops[current.index];
+        if (stop && distanceMeters(here, stop) <= ARRIVE_METERS) {
+          goToNextStop({ stop, here });
+        }
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsError(
+            "Location access was denied. Allow it in your browser settings, then press Start trip again."
+          );
+          stopWatching();
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setGpsError("Your location is not available right now.");
+        } else {
+          setGpsError("Finding your location is taking a while...");
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+  }
+
+  function stopState(i: number): StopState {
+    if (tripDone) return "done";
+    if (!navigating) return "todo";
+    if (i < navIndex) return "done";
+    if (i === navIndex) return "current";
+    return "todo";
+  }
+
+  // ---- Search and discovery ----
+  async function handlePick(lat: number, lon: number) {
+    const id = `custom-${Date.now()}`;
+    setDropped({ id, name: "Dropped pin", category: "Custom spot", lat, lon });
+
+    // Look up the address in the background and fill it in
+    const info = await lookupAddress(lat, lon);
+    if (info) {
+      setDropped((d) => (d && d.id === id ? { ...d, name: info.name, address: info.address } : d));
+    }
+  }
+
+  async function handleSearch(e: FormEvent) {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setLoading(true);
+    setMessage("");
+    setFound([]);
+    setActiveCategory(null);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`
+      );
+      const data: NominatimResult[] = await res.json();
+
+      const places: Place[] = data.map((r) => ({
+        id: String(r.place_id),
+        name: r.name || r.display_name.split(",")[0],
+        category: prettify(r.type),
+        address: r.display_name,
+        lat: parseFloat(r.lat),
+        lon: parseFloat(r.lon),
+      }));
+
+      setResults(places);
+      setSelected(places[0] ?? null);
+      if (places.length === 0) setMessage("No places found. Try another search.");
+    } catch {
+      setMessage("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCategory(category: Category) {
+    if (!map) return;
+    if (map.getZoom() < 13) {
+      setMessage("Zoom in a bit, then search this area.");
+      return;
+    }
+
+    const b = map.getBounds();
+    setLoading(true);
+    setMessage("");
+    setResults([]);
+    setActiveCategory(category);
+    try {
+      const places = await findPlaces(category, {
+        south: b.getSouth(),
+        west: b.getWest(),
+        north: b.getNorth(),
+        east: b.getEast(),
+      });
+      setFound(places);
+      setMessage(
+        places.length > 0
+          ? `Found ${places.length} places. Click a pin to add it to your trip.`
+          : "Nothing found here. Try another category or move the map."
+      );
+    } catch {
+      setMessage("The places server is busy. Wait a few seconds and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex h-full w-full">
+      <TripPanel
+        trip={stops}
+        home={home}
+        startTime={startTime}
+        schedule={schedule}
+        route={route}
+        routeLoading={routeLoading}
+        routeError={routeError}
+        showRoute={showRoute}
+        mode={mode}
+        locked={navigating}
+        currentIndex={navIndex}
+        canStart={canStart}
+        progress={progress}
+        onRemove={removeFromTrip}
+        onMove={moveStop}
+        onUpdate={updateStop}
+        onStartTimeChange={setStartTime}
+        onUseMyLocation={setStartToMyLocation}
+        onClearHome={() => setHome(null)}
+        onToggleRoute={() => setShowRoute((s) => !s)}
+        onModeChange={setMode}
+        onStart={startTrip}
+        onStop={stopTrip}
+      />
+
+      <div className="relative h-full min-w-0 flex-1">
+        {/* Search panel on top of the map */}
+        <div className="absolute left-4 top-4 z-[1000] w-80 max-w-[calc(100%-2rem)]">
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search a place, e.g. Eiffel Tower"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-md outline-none focus:border-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 disabled:opacity-60"
+            >
+              {loading ? "..." : "Search"}
+            </button>
+          </form>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-3 py-1 text-xs text-gray-600 shadow-md">
+              Search this area:
+            </span>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => handleCategory(c.id)}
+                disabled={loading}
+                className={`rounded-full px-3 py-1 text-xs font-medium shadow-md disabled:opacity-60 ${
+                  activeCategory === c.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-800 hover:bg-gray-100"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {message && (
+            <p className="mt-2 rounded-lg bg-white p-3 text-sm text-gray-700 shadow-md">
+              {message}
+            </p>
+          )}
+
+          {results.length > 0 && (
+            <ul className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-white shadow-md">
+              {results.map((place) => (
+                <li key={place.id}>
+                  <button
+                    onClick={() => setSelected(place)}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                      selected?.id === place.id ? "bg-blue-50" : ""
+                    }`}
+                  >
+                    <span className="block font-medium text-gray-900">{place.name}</span>
+                    <span className="block truncate text-xs text-gray-500">
+                      {place.address}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Time-to-leave alarm */}
+        {alarm && (
+          <div className="absolute left-1/2 top-4 z-[1200] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-amber-500 p-4 text-center text-white shadow-xl">
+            <p className="text-lg font-bold">⏰ {alarm}</p>
+            <button
+              onClick={() => setAlarm(null)}
+              className="mt-2 rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+            >
+              Got it
+            </button>
+          </div>
+        )}
+
+        {/* Points and level-up message */}
+        {reward && !alarm && (
+          <div className="absolute left-1/2 top-4 z-[1100] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-white p-4 text-center shadow-xl">
+            <p className="text-base font-bold text-green-600">{reward.text}</p>
+            {reward.levelUp && (
+              <p className="mt-1 text-base font-semibold text-amber-600">{reward.levelUp}</p>
+            )}
+          </div>
+        )}
+
+        {/* Live trip card at the bottom */}
+        {(navigating || tripDone) && (
+          <NavigationCard
+            done={tripDone}
+            earned={tripPoints}
+            stop={target}
+            index={navIndex}
+            total={stops.length}
+            leg={liveLeg?.legs[0] ?? null}
+            straightMeters={position && target ? distanceMeters(position, target) : null}
+            instruction={instruction}
+            leaveFrom={prevPoint?.name ?? null}
+            leaveAt={leaveAt}
+            arriveAt={item ? item.arriveAt : null}
+            lateBySeconds={item ? item.lateBySeconds : 0}
+            accuracy={position?.accuracy ?? null}
+            error={gpsError}
+            onSkip={() => goToNextStop()}
+            onStop={stopTrip}
+          />
+        )}
+
+        <MapContainer
+          center={[48.8566, 2.3522]}
+          zoom={13}
+          style={{ height: "100%", width: "100%" }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <MapBridge onReady={setMap} />
+          <ClickHandler onPick={handlePick} disabled={navigating} />
+
+          {/* The route line from the start through all stops (faded during a trip) */}
+          {showRoute && route && (
+            <>
+              <Polyline
+                positions={route.path}
+                pathOptions={{
+                  color: "white",
+                  weight: 9,
+                  opacity: navigating ? 0.4 : 0.9,
+                  interactive: false,
+                }}
+              />
+              <Polyline
+                positions={route.path}
+                pathOptions={{
+                  color: "#2563eb",
+                  weight: 5,
+                  opacity: navigating ? 0.35 : 1,
+                  interactive: false,
+                }}
+              />
+            </>
+          )}
+
+          {/* Live route from you to the current stop */}
+          {liveLeg && (
+            <Polyline
+              positions={liveLeg.path}
+              pathOptions={{ color: "#f59e0b", weight: 6, interactive: false }}
+            />
+          )}
+
+          {/* Your position */}
+          {navigating && position && (
+            <>
+              <Circle
+                center={[position.lat, position.lon]}
+                radius={position.accuracy}
+                pathOptions={{ color: "#2563eb", weight: 1, fillOpacity: 0.1, interactive: false }}
+              />
+              <CircleMarker
+                center={[position.lat, position.lon]}
+                radius={8}
+                pathOptions={{
+                  color: "white",
+                  weight: 3,
+                  fillColor: "#2563eb",
+                  fillOpacity: 1,
+                  interactive: false,
+                }}
+              />
+            </>
+          )}
+
+          {/* Start point */}
+          {home && (
+            <Marker position={[home.lat, home.lon]} icon={homeIcon}>
+              <Popup>
+                <strong>{home.name}</strong>
+                <br />
+                <span>Start point</span>
+                {!navigating && (
+                  <>
+                    <br />
+                    <button
+                      onClick={() => setHome(null)}
+                      className="mt-2 rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    >
+                      Remove start point
+                    </button>
+                  </>
+                )}
+              </Popup>
+            </Marker>
+          )}
+
+          {results
+            .filter((p) => !tripIds.has(p.id))
+            .map((place) => (
+              <PlaceMarker key={place.id} place={place} onAdd={addToTrip} onSetStart={setStart} />
+            ))}
+
+          {found
+            .filter((p) => !tripIds.has(p.id))
+            .map((place) => (
+              <PlaceMarker key={place.id} place={place} onAdd={addToTrip} onSetStart={setStart} />
+            ))}
+
+          {dropped && (
+            <PlaceMarker
+              key={dropped.id}
+              markerRef={droppedRef}
+              place={dropped}
+              onAdd={(p) => {
+                addToTrip(p);
+                setDropped(null);
+              }}
+              onSetStart={(p) => {
+                setStart(p);
+                setDropped(null);
+              }}
+            />
+          )}
+
+          {stops.map((place, i) => (
+            <Marker
+              key={place.id}
+              position={[place.lat, place.lon]}
+              icon={stopIcon(i + 1, stopState(i))}
+            >
+              <Popup>
+                <strong>{place.name}</strong>
+                {place.arriveBy && (
+                  <>
+                    <br />
+                    <span>Be there at {place.arriveBy}</span>
+                  </>
+                )}
+                <br />
+                <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                  {place.lat.toFixed(5)}, {place.lon.toFixed(5)}
+                </span>
+                {!navigating && (
+                  <>
+                    <br />
+                    <button
+                      onClick={() => removeFromTrip(place.id)}
+                      className="mt-2 rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    >
+                      Remove from trip
+                    </button>
+                  </>
+                )}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+    </div>
+  );
+}

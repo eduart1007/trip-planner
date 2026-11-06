@@ -1,0 +1,10 @@
+export type Place = {
+  id: string;
+  name: string;
+  category: string;
+  lat: number;
+  lon: number;
+  address?: string;
+  stayMinutes?: number; // how long you stay at this stop (default 30)
+  arriveBy?: string; // "HH:MM": the time you want to be here (optional)
+};
