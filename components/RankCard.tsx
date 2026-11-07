@@ -1,5 +1,6 @@
 "use client";
 
+import AccountIcon from "@/components/AccountIcon";
 import { t } from "@/lib/i18n";
 import { MAX_NAMED_LEVEL, POINTS_PER_KM, getLevel, type Progress } from "@/lib/rank";
 import { formatDistance } from "@/lib/routing";
@@ -33,7 +34,7 @@ export default function RankCard({
         aria-label={t("account")}
         className="absolute right-11 top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
       >
-        👤
+        <AccountIcon className="block h-[1.125rem] w-[1.125rem] text-sky-200" />
       </button>
       <button
         onClick={onOpenSettings}

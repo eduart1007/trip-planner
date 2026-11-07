@@ -11,6 +11,7 @@ import {
   saveTrip,
   type CloudTrip,
 } from "@/lib/cloud";
+import AccountIcon from "@/components/AccountIcon";
 import { t } from "@/lib/i18n";
 import type { SavedPlan } from "@/lib/plan";
 import { supabase } from "@/lib/supabase";
@@ -144,7 +145,10 @@ export default function AccountPanel({
         className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 text-gray-900 shadow-xl dark:bg-gray-900 dark:text-gray-100 md:max-w-md md:rounded-2xl"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">👤 {t("account")}</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <AccountIcon className="h-5 w-5 text-sky-400" />
+            {t("account")}
+          </h2>
           <button
             onClick={onClose}
             aria-label={t("close")}
