@@ -29,6 +29,7 @@ import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
+import { searchPlaces } from "@/lib/search";
 import { buildIcs, downloadFile, printTrip } from "@/lib/export";
 import { optimizeOrder } from "@/lib/optimize";
 import { buildShareUrl, consumeSharedPlan } from "@/lib/share";
@@ -923,6 +924,10 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        onSearch={(q) =>
+          searchPlaces(q, map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : undefined)
+        }
+        onAddPlace={addToTrip}
         onCalendar={exportCalendar}
         onPrint={printPlan}
         orderNote={orderNote}

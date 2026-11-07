@@ -244,4 +244,10 @@ export const TRANSLATIONS = {
   print: { en: "Print", es: "Imprimir", fr: "Imprimer", de: "Drucken", pt: "Imprimir" },
   total: { en: "Total", es: "Total", fr: "Total", de: "Gesamt", pt: "Total" },
   popupBlocked: { en: "Allow pop-ups to print your plan.", es: "Permite las ventanas emergentes para imprimir tu plan.", fr: "Autorisez les fenêtres pop-up pour imprimer votre plan.", de: "Erlaube Pop-ups, um deinen Plan zu drucken.", pt: "Permita pop-ups para imprimir seu plano." },
+
+  // ---- Extend the route ----
+  extendRoute: { en: "Add a stop", es: "Añadir una parada", fr: "Ajouter une étape", de: "Stopp hinzufügen", pt: "Adicionar uma parada" },
+  addStopPlaceholder: { en: "Type a place and press Enter", es: "Escribe un lugar y pulsa Intro", fr: "Saisissez un lieu et appuyez sur Entrée", de: "Ort eingeben und Enter drücken", pt: "Digite um lugar e pressione Enter" },
+  returnToStart: { en: "Return to start", es: "Volver al inicio", fr: "Retour au départ", de: "Zurück zum Start", pt: "Voltar ao início" },
+  tools: { en: "Tools", es: "Herramientas", fr: "Outils", de: "Werkzeuge", pt: "Ferramentas" },
 } satisfies Record<string, Entry>;
