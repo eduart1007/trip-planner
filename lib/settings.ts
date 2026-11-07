@@ -1,4 +1,7 @@
+import { detectLanguage, setLanguage, t, type Language } from "./i18n";
+
 export type Settings = {
+  language: Language;
   units: "km" | "mi";
   clock: "24h" | "12h";
   theme: "light" | "dark" | "auto";
@@ -6,6 +9,7 @@ export type Settings = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  language: "en",
   units: "km",
   clock: "24h",
   theme: "light",
@@ -23,16 +27,18 @@ export function getSettings() {
 
 export function setCurrentSettings(settings: Settings) {
   current = settings;
+  setLanguage(settings.language);
 }
 
+// Saved settings, or defaults (the language starts as your browser's language)
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const saved = raw ? JSON.parse(raw) : {};
+    return { ...DEFAULT_SETTINGS, language: detectLanguage(), ...saved };
   } catch {
-    // ignore and use the defaults
+    return { ...DEFAULT_SETTINGS, language: detectLanguage() };
   }
-  return DEFAULT_SETTINGS;
 }
 
 export function saveSettings(settings: Settings) {
@@ -49,7 +55,7 @@ const TEXT_SCALE: Record<Settings["textSize"], string> = {
   xlarge: "125%",
 };
 
-// Applies dark mode and text size to the whole page
+// Applies dark mode, text size and language to the whole page
 export function applySettings(settings: Settings) {
   const root = document.documentElement;
   const dark =
@@ -57,6 +63,7 @@ export function applySettings(settings: Settings) {
     (settings.theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   root.classList.toggle("dark", dark);
   root.style.fontSize = TEXT_SCALE[settings.textSize];
+  root.lang = settings.language;
 }
 
 // Label of an hour in the time dropdowns: "14" or "2 PM"
@@ -69,16 +76,16 @@ export function hourLabel(hour: number) {
 export function spokenDistance(meters: number) {
   if (current.units === "mi") {
     const feet = meters * 3.28084;
-    if (feet < 600) return `${Math.max(50, Math.round(feet / 50) * 50)} feet`;
-    return `${(meters / 1609.344).toFixed(1)} miles`;
+    if (feet < 600) return t("spokenFt", { n: Math.max(50, Math.round(feet / 50) * 50) });
+    return t("spokenMi", { n: (meters / 1609.344).toFixed(1) });
   }
-  if (meters < 1000) return `${Math.max(10, Math.round(meters / 10) * 10)} meters`;
-  return `${(meters / 1000).toFixed(1)} kilometers`;
+  if (meters < 1000) return t("spokenM", { n: Math.max(10, Math.round(meters / 10) * 10) });
+  return t("spokenKm", { n: (meters / 1000).toFixed(1) });
 }
 
 // For the "points per km" line
 export function pointsUnit() {
-  return current.units === "mi" ? "mile" : "km";
+  return current.units === "mi" ? "mi" : "km";
 }
 
 export function pointsPerUnit(perKm: number) {

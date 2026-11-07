@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 import { useEffect, useRef, type RefObject } from "react";
 import L from "leaflet";
 import { Marker, Popup, useMap, useMapEvents } from "react-leaflet";
@@ -105,13 +107,13 @@ export function PlaceMarker({
             onClick={() => onAdd(place)}
             className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
           >
-            Add to trip
+            {t("addToTrip")}
           </button>
           <button
             onClick={() => onSetStart(place)}
             className="rounded bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-700"
           >
-            Set as start
+            {t("setAsStart")}
           </button>
         </div>
       </Popup>

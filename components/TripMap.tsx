@@ -1,5 +1,7 @@
 "use client";
 
+import { t, type TKey } from "@/lib/i18n";
+
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import L from "leaflet";
 import {
@@ -102,7 +104,10 @@ async function lookupAddress(lat: number, lon: number) {
 }
 
 export default function TripMap() {
-  const [initial] = useState(loadPlan);
+  const [initial] = useState(() => {
+    setCurrentSettings(loadSettings()); // so the first texts use the saved language
+    return loadPlan();
+  });
 
   const [map, setMap] = useState<L.Map | null>(null);
   const [query, setQuery] = useState("");
@@ -112,7 +117,7 @@ export default function TripMap() {
   const [selected, setSelected] = useState<Place | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("Tip: click anywhere on the map to drop a pin.");
+  const [message, setMessage] = useState(() => t("tip"));
   const [tab, setTab] = useState<"plan" | "map">("map"); // phone: which view is showing
 
   // The plan (saved in this browser)
@@ -363,9 +368,9 @@ export default function TripMap() {
   let instruction: string | null = null;
   if (nextStep && position) {
     instruction =
-      nextStep.text === "You have arrived"
-        ? "Your stop is just ahead"
-        : `In ${formatDistance(distanceMeters(position, nextStep))}: ${nextStep.text}`;
+      nextStep.arrive
+        ? t("stopAhead")
+        : t("inDist", { d: formatDistance(distanceMeters(position, nextStep)), text: nextStep.text });
   }
 
   // Speak the next turn: once when it comes up, and once when it is close
@@ -373,17 +378,17 @@ export default function TripMap() {
     if (!navigating || !voiceOn || !nextStep || !position) return;
     const meters = distanceMeters(position, nextStep);
     const base = `${navIndex}|${nextStep.lat.toFixed(5)},${nextStep.lon.toFixed(5)}`;
-    const arriving = nextStep.text === "You have arrived";
+    const arriving = nextStep.arrive;
 
     if (meters <= 30 && !spoken.current.has(`${base}|now`)) {
       spoken.current.add(`${base}|now`);
       spoken.current.add(`${base}|far`);
-      speak(arriving ? "Your stop is just ahead" : nextStep.text);
+      speak(arriving ? t("stopAhead") : nextStep.text);
     } else if (!spoken.current.has(`${base}|far`)) {
       spoken.current.add(`${base}|far`);
       const how = spokenDistance(meters);
       const text = nextStep.text.charAt(0).toLowerCase() + nextStep.text.slice(1);
-      speak(arriving ? `Your stop is in ${how}` : `In ${how}, ${text}`);
+      speak(arriving ? t("stopIn", { d: how }) : t("inDistSpoken", { d: how, text }));
     }
   }, [navigating, voiceOn, nextStep, position, navIndex]);
 
@@ -420,28 +425,28 @@ export default function TripMap() {
 
   function setStart(place: Place) {
     setHome({ ...place, id: `home-${place.id}`, category: "Start" });
-    setMessage(`Start point set: ${place.name}`);
+    setMessage(t("startSet", { name: place.name }));
   }
 
   function setStartToMyLocation() {
     if (!navigator.geolocation) {
-      setMessage("Your browser does not support GPS.");
+      setMessage(t("noGps"));
       return;
     }
-    setMessage("Finding your location...");
+    setMessage(t("findingLocation"));
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lon } = pos.coords;
         const id = `home-${Date.now()}`;
-        setHome({ id, name: "My location", category: "Start", lat, lon });
-        setMessage("Start point set to your location.");
+        setHome({ id, name: t("myLocation"), category: "Start", lat, lon });
+        setMessage(t("startSetLocation"));
         map?.flyTo([lat, lon], 15);
         const info = await lookupAddress(lat, lon);
         if (info) {
           setHome((h) => (h && h.id === id ? { ...h, name: info.name, address: info.address } : h));
         }
       },
-      () => setMessage("Could not get your location. Allow location access and try again."),
+      () => setMessage(t("locationFailed")),
       { enableHighAccuracy: true, timeout: 15000 }
     );
   }
@@ -461,7 +466,7 @@ export default function TripMap() {
   // Move the map to where you are
   function locateMe(announce: boolean) {
     if (!navigator.geolocation) {
-      if (announce) setMessage("Your browser does not support GPS.");
+      if (announce) setMessage(t("noGps"));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -476,7 +481,7 @@ export default function TripMap() {
       },
       () => {
         if (announce) {
-          setMessage("Could not get your location. Allow location access and try again.");
+          setMessage(t("locationFailed"));
         }
       },
       // The first look-up on opening is quick and cheap; the button asks for a precise one
@@ -515,7 +520,7 @@ export default function TripMap() {
     const from = run.index === 0 ? run.home : run.stops[run.index - 1];
     if (run.position && from && distanceMeters(run.position, from) > LEAVE_RADIUS_METERS) return;
 
-    const text = `Time to leave for ${stop.name}`;
+    const text = t("timeToLeave", { name: stop.name });
     playAlarm(text);
     setAlarm(text);
   }
@@ -568,7 +573,7 @@ export default function TripMap() {
       // Remember the real arrival time, so the rest of the plan follows it
       setArrivals((a) => ({ ...a, [reached.stop.id]: secondsNow() }));
       setDelaySeconds(0);
-      speak(`You have arrived at ${reached.stop.name}`);
+      speak(t("arrivedAt", { name: reached.stop.name }));
       setAlarm(null);
     } else {
       run.skipped += 1;
@@ -595,16 +600,16 @@ export default function TripMap() {
 
       let text =
         earned > 0
-          ? `+${earned} points at ${reached.stop.name}!`
-          : `Reached ${reached.stop.name}. Too close to your last point to earn points.`;
-      if (tripBonus > 0) text += ` Trip bonus +${tripBonus}!`;
+          ? t("pointsAt", { n: earned, name: reached.stop.name })
+          : t("tooClose", { name: reached.stop.name });
+      if (tripBonus > 0) text += ` ${t("tripBonus", { n: tripBonus })}`;
 
       const levelBefore = getLevel(before.points);
       const levelAfter = getLevel(after.points);
       showReward(
         text,
         levelAfter.level > levelBefore.level
-          ? `Level up! Level ${levelAfter.level}: ${levelAfter.rank.emoji} ${levelAfter.rank.name}`
+          ? t("levelUp", { n: levelAfter.level, rank: `${levelAfter.rank.emoji} ${levelAfter.rank.name}` })
           : undefined
       );
     }
@@ -646,7 +651,7 @@ export default function TripMap() {
     setNavigating(true);
 
     if (!navigator.geolocation) {
-      setGpsError("Your browser does not support GPS.");
+      setGpsError(t("noGps"));
       return;
     }
 
@@ -671,13 +676,13 @@ export default function TripMap() {
       (err) => {
         if (err.code === err.PERMISSION_DENIED) {
           setGpsError(
-            "Location access was denied. Allow it in your browser settings, then press Start trip again."
+            t("gpsDenied")
           );
           stopWatching();
         } else if (err.code === err.POSITION_UNAVAILABLE) {
-          setGpsError("Your location is not available right now.");
+          setGpsError(t("gpsUnavailable"));
         } else {
-          setGpsError("Finding your location is taking a while...");
+          setGpsError(t("gpsSlow"));
         }
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
@@ -695,7 +700,7 @@ export default function TripMap() {
   // ---- Search and discovery ----
   async function handlePick(lat: number, lon: number) {
     const id = `custom-${Date.now()}`;
-    setDropped({ id, name: "Dropped pin", category: "Custom spot", lat, lon });
+    setDropped({ id, name: t("droppedPin"), category: t("customSpot"), lat, lon });
 
     // Look up the address in the background and fill it in
     const info = await lookupAddress(lat, lon);
@@ -729,9 +734,9 @@ export default function TripMap() {
 
       setResults(places);
       setSelected(places[0] ?? null);
-      if (places.length === 0) setMessage("No places found. Try another search.");
+      if (places.length === 0) setMessage(t("noPlaces"));
     } catch {
-      setMessage("Something went wrong. Please try again.");
+      setMessage(t("wentWrong"));
     } finally {
       setLoading(false);
     }
@@ -740,7 +745,7 @@ export default function TripMap() {
   async function handleCategory(category: Category) {
     if (!map) return;
     if (map.getZoom() < 13) {
-      setMessage("Zoom in a bit, then search this area.");
+      setMessage(t("zoomIn"));
       return;
     }
 
@@ -759,11 +764,11 @@ export default function TripMap() {
       setFound(places);
       setMessage(
         places.length > 0
-          ? `Found ${places.length} places. Click a pin to add it to your trip.`
-          : "Nothing found here. Try another category or move the map."
+          ? t("foundPlaces", { n: places.length })
+          : t("nothingHere")
       );
     } catch {
-      setMessage("The places server is busy. Wait a few seconds and try again.");
+      setMessage(t("serverBusy"));
     } finally {
       setLoading(false);
     }
@@ -809,7 +814,7 @@ export default function TripMap() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search a place, e.g. Eiffel Tower"
+              placeholder={t("searchPlaceholder")}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-md outline-none focus:border-blue-500"
             />
             <button
@@ -817,12 +822,12 @@ export default function TripMap() {
               disabled={loading}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 disabled:opacity-60"
             >
-              {loading ? "..." : "Search"}
+              {loading ? "..." : t("search")}
             </button>
             <button
               type="button"
               onClick={() => locateMe(true)}
-              aria-label="Go to my location"
+              aria-label={t("goToMe")}
               className="rounded-lg bg-white px-3 py-2 text-base shadow-md hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800"
             >
               📍
@@ -831,7 +836,7 @@ export default function TripMap() {
 
           <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto py-1 md:flex-wrap md:overflow-visible">
             <span className="shrink-0 whitespace-nowrap rounded-full bg-white dark:bg-gray-900 px-3 py-1 text-xs text-gray-600 dark:text-gray-400 shadow-md">
-              Search this area:
+              {t("searchArea")}
             </span>
             {CATEGORIES.map((c) => (
               <button
@@ -844,7 +849,7 @@ export default function TripMap() {
                     : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                {c.label}
+                {t(`cat_${c.id}` as TKey)}
               </button>
             ))}
           </div>
@@ -884,7 +889,7 @@ export default function TripMap() {
               onClick={() => setAlarm(null)}
               className="mt-2 rounded-lg bg-white dark:bg-gray-900 px-4 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
             >
-              Got it
+              {t("gotIt")}
             </button>
           </div>
         )}
@@ -1020,7 +1025,7 @@ export default function TripMap() {
               <Popup>
                 <strong>{home.name}</strong>
                 <br />
-                <span>Start point</span>
+                <span>{t("startPoint")}</span>
                 {!navigating && (
                   <>
                     <br />
@@ -1028,7 +1033,7 @@ export default function TripMap() {
                       onClick={() => setHome(null)}
                       className="mt-2 rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
                     >
-                      Remove start point
+                      {t("removeStart")}
                     </button>
                   </>
                 )}
@@ -1075,7 +1080,7 @@ export default function TripMap() {
                 {place.arriveBy && (
                   <>
                     <br />
-                    <span>Be there at {formatClock(toSeconds(place.arriveBy) ?? 0)}</span>
+                    <span>{t("beThere")} {formatClock(toSeconds(place.arriveBy) ?? 0)}</span>
                   </>
                 )}
                 <br />
@@ -1089,7 +1094,7 @@ export default function TripMap() {
                       onClick={() => removeFromTrip(place.id)}
                       className="mt-2 rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
                     >
-                      Remove from trip
+                      {t("removeFromTrip")}
                     </button>
                   </>
                 )}
@@ -1121,7 +1126,7 @@ export default function TripMap() {
             tab === "plan" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
           }`}
         >
-          📋 Plan{stops.length > 0 ? ` (${stops.length})` : ""}
+          📋 {t("tabPlan")}{stops.length > 0 ? ` (${stops.length})` : ""}
         </button>
         <button
           onClick={() => setTab("map")}
@@ -1129,7 +1134,7 @@ export default function TripMap() {
             tab === "map" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
           }`}
         >
-          🗺️ Map
+          🗺️ {t("tabMap")}
         </button>
       </nav>
     </div>

@@ -1,3 +1,5 @@
+import { speechLang, t } from "./i18n";
+
 let audio: AudioContext | null = null;
 let voiceEnabled = true;
 
@@ -18,7 +20,7 @@ export function speak(text: string) {
   try {
     if (!("speechSynthesis" in window)) return;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
+    utterance.lang = speechLang();
     window.speechSynthesis.speak(utterance);
   } catch {
     // voice is optional
@@ -83,7 +85,7 @@ export function playAlarm(message: string) {
   speak(message);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Time to leave", { body: message });
+      new Notification(t("notifTitle"), { body: message });
     }
   } catch {
     // ignore

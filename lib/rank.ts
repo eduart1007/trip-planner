@@ -1,3 +1,4 @@
+import { t, type TKey } from "./i18n";
 import type { TravelMode } from "./routing";
 
 // ---- Points ----
@@ -32,8 +33,9 @@ export function getLevel(points: number) {
   RANKS.forEach((r, i) => {
     if (points >= r.min) index = i;
   });
-  const rank = RANKS[index];
-  const next = RANKS[index + 1] ?? null;
+  const rank = { ...RANKS[index], name: t(`rank${index}` as TKey) };
+  const nextBase = RANKS[index + 1];
+  const next = nextBase ? { ...nextBase, name: t(`rank${index + 1}` as TKey) } : null;
   return {
     level: index + 1,
     rank,

@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 import { Fragment } from "react";
 import RankCard from "@/components/RankCard";
 import TimeSelect from "@/components/TimeSelect";
@@ -23,11 +25,8 @@ import { pointsPerUnit, pointsUnit } from "@/lib/settings";
 import type { Place } from "@/lib/types";
 import type { StopWeather } from "@/lib/weather";
 
-const WHERE: Record<TravelMode, string> = {
-  foot: "on foot",
-  bike: "by bike",
-  car: "by car",
-};
+const WORTH_KEYS = { foot: "worth_foot", bike: "worth_bike", car: "worth_car" } as const;
+const MODE_KEYS = { foot: "mode_foot", bike: "mode_bike", car: "mode_car" } as const;
 
 type Props = {
   trip: Place[];
@@ -89,11 +88,11 @@ export default function TripPanel({
   const modeIcon = MODES.find((m) => m.id === mode)?.icon ?? "";
 
   // Whole-trip summary
-  let summary = "No stops yet";
-  if (trip.length > 0) summary = `${trip.length} stop${trip.length === 1 ? "" : "s"}`;
+  let summary = t("noStops");
+  if (trip.length > 0) summary = t(trip.length === 1 ? "stop1" : "stopN", { n: trip.length });
   const tripStart = schedule ? (schedule.items[0]?.leaveAt ?? schedule.startAt) : null;
   if (schedule && tripStart !== null && trip.length > 0) {
-    summary += ` · ${formatClock(tripStart)} to ${formatClock(schedule.endAt)} (${formatDuration(
+    summary += ` · ${formatClock(tripStart)} – ${formatClock(schedule.endAt)} (${formatDuration(
       schedule.endAt - tripStart
     )})`;
   }
@@ -111,16 +110,16 @@ export default function TripPanel({
   }
 
   let routeInfo = "";
-  if (chain.length < 2) routeInfo = "Add a start point and a stop, or two stops, to see the route.";
-  else if (routeLoading) routeInfo = "Finding route...";
-  else if (routeError) routeInfo = "Could not get the route. Try again in a moment.";
-  else if (route) routeInfo = `Route: ${formatDistance(route.distance)} · ${formatDuration(route.duration)} of travel`;
+  if (chain.length < 2) routeInfo = t("routeNeeds");
+  else if (routeLoading) routeInfo = t("routeFinding");
+  else if (routeError) routeInfo = t("routeFail");
+  else if (route) routeInfo = `${t("routeLabel")}: ${formatDistance(route.distance)} · ${formatDuration(route.duration)}`;
 
   let startHint = "";
   if (trip.length > 0 && !canStart) {
     startHint = routeError
-      ? "Could not calculate travel times. Check your stops and try again."
-      : "Calculating travel times...";
+      ? t("hintFail")
+      : t("hintCalc");
   }
 
   return (
@@ -137,16 +136,16 @@ export default function TripPanel({
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-              {home ? home.name : "No start point yet"}
+              {home ? home.name : t("noStart")}
             </p>
             <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-              {home ? "Start point" : "Use your location, or pick a place and press Set as start"}
+              {home ? t("startPoint") : t("noStartHint")}
             </p>
           </div>
           {home && !locked && (
             <button
               onClick={onClearHome}
-              aria-label="Remove start point"
+              aria-label={t("removeStart")}
               className="text-gray-400 dark:text-gray-500 hover:text-red-600"
             >
               ✕
@@ -159,12 +158,12 @@ export default function TripPanel({
             onClick={onUseMyLocation}
             className="mt-2 w-full rounded-lg border border-violet-600 px-3 py-1.5 text-sm font-medium text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950"
           >
-            📍 Use my location as start
+            {t("useMyLocation")}
           </button>
         )}
 
         <div className="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-          <span>{home ? "Leave at" : "Start at"}</span>
+          <span>{home ? t("leaveAt") : t("startAt")}</span>
           <TimeSelect
             value={startTime}
             onChange={(t) => {
@@ -174,30 +173,30 @@ export default function TripPanel({
           />
         </div>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Earliest time you can leave. A “Be there at” time can make it later.
+          {t("leaveHint")}
         </p>
       </div>
 
       <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {locked ? "Trip in progress 🔒" : "My trip"}
+          {locked ? t("tripInProgress") : t("myTrip")}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">{summary}</p>
         {rainStops > 0 && (
           <p className="mt-1 text-sm font-medium text-blue-700 dark:text-blue-300">
-            ☔ Rain is likely at {rainStops} stop{rainStops === 1 ? "" : "s"}. Take an umbrella.
+            ☔ {t(rainStops === 1 ? "rain1" : "rainN", { n: rainStops })}
           </p>
         )}
         {lateCount > 0 && (
           <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-400">
-            ⚠ You will be late at {lateCount} stop{lateCount === 1 ? "" : "s"}. Change the times or the order.
+            ⚠ {t(lateCount === 1 ? "late1" : "lateN", { n: lateCount })}
           </p>
         )}
       </div>
 
       {trip.length === 0 ? (
         <p className="p-4 text-sm text-gray-500 dark:text-gray-400 md:flex-1">
-          Search the map, click a pin, or click anywhere on the map, then press Add to trip.
+          {t("emptyHint")}
         </p>
       ) : (
         <ol className="md:flex-1 md:overflow-y-auto">
@@ -218,8 +217,8 @@ export default function TripPanel({
                   <li className="flex items-start gap-3 bg-blue-50 dark:bg-blue-950 px-4 py-1.5 text-xs text-blue-700 dark:text-blue-300">
                     <span className="w-7 text-center">{modeIcon}</span>
                     <span className="flex-1">
-                      {leg ? `${formatDuration(leg.duration)} · ${formatDistance(leg.distance)}` : "Travel"}
-                      {item && item.leaveAt !== null && ` · leave ${formatClock(item.leaveAt)}`}
+                      {leg ? `${formatDuration(leg.duration)} · ${formatDistance(leg.distance)}` : t("travel")}
+                      {item && item.leaveAt !== null && ` · ${t("leave")} ${formatClock(item.leaveAt)}`}
                     </span>
                     {legPoints > 0 && (
                       <span className="font-semibold text-amber-600 dark:text-amber-400">+{legPoints} pts</span>
@@ -245,7 +244,7 @@ export default function TripPanel({
                       value={place.name}
                       onChange={(e) => onUpdate(place.id, { name: e.target.value })}
                       disabled={locked}
-                      aria-label="Stop name"
+                      aria-label={t("stopName")}
                       className="w-full truncate rounded bg-transparent px-1 py-0.5 text-sm font-medium text-gray-900 dark:text-gray-100 outline-none hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800"
                     />
                     <p className="truncate px-1 text-xs text-gray-500 dark:text-gray-400">{place.category}</p>
@@ -256,10 +255,10 @@ export default function TripPanel({
                           item.lateBySeconds > 0 ? "font-semibold text-red-600 dark:text-red-400" : "text-gray-700 dark:text-gray-300"
                         }`}
                       >
-                        {visited ? "Arrived" : "Arrive"} {formatClock(item.arriveAt)} · leave{" "}
+                        {visited ? t("arrived") : t("arrive")} {formatClock(item.arriveAt)} · {t("leave")}{" "}
                         {formatClock(item.departAt)}
                         {item.lateBySeconds > 0 &&
-                          ` · ${Math.ceil(item.lateBySeconds / 60)} min late`}
+                          ` · ${t("minLate", { n: Math.ceil(item.lateBySeconds / 60) })}`}
                       </p>
                     )}
 
@@ -269,13 +268,13 @@ export default function TripPanel({
                           w.rainLikely ? "font-medium text-blue-700 dark:text-blue-300" : "text-gray-600 dark:text-gray-400"
                         }`}
                       >
-                        {w.icon} {Math.round(w.temp)}°C · {w.rainChance}% rain
+                        {w.icon} {Math.round(w.temp)}°C · {t("rainChance", { n: w.rainChance })}
                       </p>
                     )}
 
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 px-1 text-xs text-gray-500 dark:text-gray-400">
                       <label className="flex items-center gap-1">
-                        Stay
+                        {t("stay")}
                         <input
                           type="number"
                           min={0}
@@ -294,7 +293,7 @@ export default function TripPanel({
                         min
                       </label>
                       <div className="flex items-center gap-1">
-                        <span title="The time you want to arrive. The app plans when to leave so you are there on time.">Be there at</span>
+                        <span title={t("beThereHint")}>{t("beThere")}</span>
                         <TimeSelect
                           value={place.arriveBy}
                           onChange={(t) => onUpdate(place.id, { arriveBy: t })}
@@ -309,14 +308,14 @@ export default function TripPanel({
                       <button
                         onClick={() => onMove(place.id, -1)}
                         disabled={i === 0}
-                        aria-label="Move up"
+                        aria-label={t("moveUp")}
                         className="px-1 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30"
                       >
                         ▲
                       </button>
                       <button
                         onClick={() => onRemove(place.id)}
-                        aria-label={`Remove ${place.name}`}
+                        aria-label={`${t("remove")} ${place.name}`}
                         className="px-1 hover:text-red-600"
                       >
                         ✕
@@ -324,7 +323,7 @@ export default function TripPanel({
                       <button
                         onClick={() => onMove(place.id, 1)}
                         disabled={i === trip.length - 1}
-                        aria-label="Move down"
+                        aria-label={t("moveDown")}
                         className="px-1 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30"
                       >
                         ▼
@@ -351,13 +350,17 @@ export default function TripPanel({
                   : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
-              {m.icon} {m.label}
+              {m.icon} {t(MODE_KEYS[m.id])}
             </button>
           ))}
         </div>
         <p className="mb-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Points per {pointsUnit()}: Walk {pointsPerUnit(POINTS_PER_KM.foot)} · Bike{" "}
-          {pointsPerUnit(POINTS_PER_KM.bike)} · Drive {pointsPerUnit(POINTS_PER_KM.car)}
+          {t("pointsPer", {
+            unit: pointsUnit(),
+            walk: pointsPerUnit(POINTS_PER_KM.foot),
+            bike: pointsPerUnit(POINTS_PER_KM.bike),
+            drive: pointsPerUnit(POINTS_PER_KM.car),
+          })}
         </p>
 
         <button
@@ -365,14 +368,14 @@ export default function TripPanel({
           disabled={chain.length < 2}
           className="w-full rounded-lg border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50"
         >
-          {showRoute ? "Hide route line" : "Show route line"}
+          {showRoute ? t("hideRoute") : t("showRoute")}
         </button>
 
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{routeInfo}</p>
 
         {trip.length > 0 && (
           <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-400">
-            🏆 Worth {tripPoints}+ points {WHERE[mode]}
+            🏆 {t(WORTH_KEYS[mode], { n: tripPoints })}
           </p>
         )}
 
@@ -381,7 +384,7 @@ export default function TripPanel({
             onClick={onStop}
             className="mt-3 w-full rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
           >
-            Stop trip
+            {t("stopTrip")}
           </button>
         ) : (
           <button
@@ -389,7 +392,7 @@ export default function TripPanel({
             disabled={!canStart}
             className="mt-3 w-full rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
           >
-            ▶ Start trip (locks your plan)
+            ▶ {t("startTrip")}
           </button>
         )}
         {startHint && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{startHint}</p>}

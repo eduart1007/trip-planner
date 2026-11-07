@@ -1,5 +1,6 @@
 "use client";
 
+import { LANGUAGES, t, type Language } from "@/lib/i18n";
 import type { Settings } from "@/lib/settings";
 
 type ChoiceProps<T extends string> = {
@@ -21,7 +22,7 @@ function Choice<T extends string>({ label, value, options, onChange }: ChoicePro
             className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
               value === o.value
                 ? "border-blue-600 bg-blue-600 font-medium text-white"
-                : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                : "border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
             }`}
           >
             {o.label}
@@ -41,7 +42,7 @@ export default function SettingsPanel({
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
   onClose: () => void;
-  onOpenGuide: () => void;
+  onOpenGuide?: () => void;
 }) {
   return (
     <div
@@ -50,79 +51,94 @@ export default function SettingsPanel({
     >
       <div
         role="dialog"
-        aria-label="Settings"
+        aria-label={t("settings")}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white dark:bg-gray-900 p-5 text-gray-900 dark:text-gray-100 shadow-xl md:max-w-md md:rounded-2xl"
+        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 text-gray-900 shadow-xl dark:bg-gray-900 dark:text-gray-100 md:max-w-md md:rounded-2xl"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">⚙️ Settings</h2>
+          <h2 className="text-lg font-semibold">⚙️ {t("settings")}</h2>
           <button
             onClick={onClose}
-            aria-label="Close settings"
-            className="text-xl text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
+            aria-label={t("closeSettings")}
+            className="text-xl text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"
           >
             ✕
           </button>
         </div>
 
+        <div className="mt-5">
+          <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            🌐 {t("language")}
+          </p>
+          <select
+            value={settings.language}
+            onChange={(e) => onChange({ language: e.target.value as Language })}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <Choice
-          label="Distance"
+          label={t("distance")}
           value={settings.units}
           options={[
-            { value: "km", label: "Kilometers" },
-            { value: "mi", label: "Miles" },
+            { value: "km", label: t("kilometers") },
+            { value: "mi", label: t("miles") },
           ]}
           onChange={(units) => onChange({ units })}
         />
 
         <Choice
-          label="Clock"
+          label={t("clock")}
           value={settings.clock}
           options={[
-            { value: "24h", label: "24-hour" },
-            { value: "12h", label: "12-hour (AM/PM)" },
+            { value: "24h", label: t("h24") },
+            { value: "12h", label: t("h12") },
           ]}
           onChange={(clock) => onChange({ clock })}
         />
 
         <Choice
-          label="Theme"
+          label={t("theme")}
           value={settings.theme}
           options={[
-            { value: "light", label: "☀️ Light" },
-            { value: "dark", label: "🌙 Dark" },
-            { value: "auto", label: "Auto" },
+            { value: "light", label: t("light") },
+            { value: "dark", label: t("dark") },
+            { value: "auto", label: t("auto") },
           ]}
           onChange={(theme) => onChange({ theme })}
         />
 
         <Choice
-          label="Text size"
+          label={t("textSize")}
           value={settings.textSize}
           options={[
-            { value: "normal", label: "Normal" },
-            { value: "large", label: "Large" },
-            { value: "xlarge", label: "Extra large" },
+            { value: "normal", label: t("normal") },
+            { value: "large", label: t("large") },
+            { value: "xlarge", label: t("xlarge") },
           ]}
           onChange={(textSize) => onChange({ textSize })}
         />
 
-        <p className="mt-5 text-xs text-gray-500 dark:text-gray-400">
-          Language choice is coming soon.
-        </p>
-
-        <button
-          onClick={onOpenGuide}
-          className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          📖 Show the guide again
-        </button>
+        {onOpenGuide && (
+          <button
+            onClick={onOpenGuide}
+            className="mt-5 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {t("showGuide")}
+          </button>
+        )}
 
         <button
           onClick={onClose}
-          className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+          className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
         >
-          Done
+          {t("done")}
         </button>
       </div>
     </div>

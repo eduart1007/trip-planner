@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 import { hourLabel } from "@/lib/settings";
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
@@ -29,7 +31,7 @@ export default function TimeSelect({
           onChange(h ? `${h}:${minute || "00"}` : undefined);
         }}
         disabled={disabled}
-        aria-label="Hour"
+        aria-label={t("hour")}
         className={selectClass}
       >
         <option value="">--</option>
@@ -44,7 +46,7 @@ export default function TimeSelect({
         value={minute || "00"}
         onChange={(e) => onChange(`${hour}:${e.target.value}`)}
         disabled={disabled || !hour}
-        aria-label="Minute"
+        aria-label={t("minute")}
         className={selectClass}
       >
         {MINUTES.map((m) => (

@@ -1,3 +1,4 @@
+import { t, type TKey } from "./i18n";
 import { getSettings } from "./settings";
 
 export type TravelMode = "foot" | "bike" | "car";
@@ -11,7 +12,7 @@ export const MODES: { id: TravelMode; label: string; icon: string }[] = [
 export type Leg = { distance: number; duration: number }; // metres, seconds
 
 // One turn-by-turn instruction, with the place where it happens
-export type Step = { text: string; distance: number; lat: number; lon: number };
+export type Step = { text: string; arrive: boolean; distance: number; lat: number; lon: number };
 
 export type RouteResult = {
   path: [number, number][]; // [lat, lon] points of the line to draw
@@ -41,26 +42,27 @@ type OsrmRoute = {
   legs: { distance: number; duration: number; steps?: OsrmStep[] }[];
 };
 
-const TURN_TEXT: Record<string, string> = {
-  left: "Turn left",
-  right: "Turn right",
-  "slight left": "Bear left",
-  "slight right": "Bear right",
-  "sharp left": "Turn sharp left",
-  "sharp right": "Turn sharp right",
+const TURN_KEYS: Record<string, TKey> = {
+  left: "turnLeft",
+  right: "turnRight",
+  "slight left": "bearLeft",
+  "slight right": "bearRight",
+  "sharp left": "sharpLeft",
+  "sharp right": "sharpRight",
 };
 
+// Turns a step from the routing service into a sentence in the chosen language
 function describeStep(step: OsrmStep) {
   const { type, modifier } = step.maneuver;
-  const road = step.name ? ` onto ${step.name}` : "";
+  const onto = step.name ? ` ${t("onto", { road: step.name })}` : "";
 
-  if (type === "arrive") return "You have arrived";
-  if (type === "depart") return step.name ? `Head along ${step.name}` : "Start moving";
-  if (type === "roundabout" || type === "rotary") return `Take the roundabout${road}`;
-  if (type === "exit roundabout" || type === "exit rotary") return `Leave the roundabout${road}`;
-  if (modifier === "uturn") return "Make a U-turn";
-  if (modifier && TURN_TEXT[modifier]) return `${TURN_TEXT[modifier]}${road}`;
-  return step.name ? `Continue on ${step.name}` : "Continue straight";
+  if (type === "arrive") return t("youArrived");
+  if (type === "depart") return step.name ? t("headAlong", { road: step.name }) : t("startMoving");
+  if (type === "roundabout" || type === "rotary") return `${t("roundabout")}${onto}`;
+  if (type === "exit roundabout" || type === "exit rotary") return `${t("leaveRoundabout")}${onto}`;
+  if (modifier === "uturn") return t("uturn");
+  if (modifier && TURN_KEYS[modifier]) return `${t(TURN_KEYS[modifier])}${onto}`;
+  return step.name ? t("continueOn", { road: step.name }) : t("continueStraight");
 }
 
 export async function getRoute(
@@ -86,6 +88,7 @@ export async function getRoute(
     steps: route.legs.flatMap((l) =>
       (l.steps ?? []).map((s) => ({
         text: describeStep(s),
+        arrive: s.maneuver.type === "arrive",
         distance: s.distance,
         lat: s.maneuver.location[1],
         lon: s.maneuver.location[0],

@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 import { getLevel, type Progress } from "@/lib/rank";
 import { formatDistance } from "@/lib/routing";
 
@@ -16,7 +18,7 @@ export default function RankCard({
     <div className="relative bg-blue-600 p-4 text-white">
       <button
         onClick={onOpenSettings}
-        aria-label="Settings"
+        aria-label={t("settings")}
         className="absolute right-3 top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
       >
         ⚙️
@@ -25,7 +27,7 @@ export default function RankCard({
       <div className="flex items-center justify-between pr-10">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
-            Level {level}
+            {t("level", { n: level })}
           </p>
           <p className="text-lg font-bold">
             {rank.emoji} {rank.name}
@@ -33,7 +35,7 @@ export default function RankCard({
         </div>
         <div className="text-right">
           <p className="text-2xl font-bold leading-none">{progress.points}</p>
-          <p className="text-xs text-blue-100">points</p>
+          <p className="text-xs text-blue-100">{t("points")}</p>
         </div>
       </div>
 
@@ -44,10 +46,10 @@ export default function RankCard({
         />
       </div>
       <p className="mt-1 text-xs text-blue-100">
-        {next ? `${toNext} points to ${next.name}` : "Top rank reached!"}
+        {next ? t("pointsTo", { n: toNext, rank: next.name }) : t("topRank")}
       </p>
       <p className="mt-1 text-xs text-blue-100">
-        {progress.stops} stops · {progress.trips} trips · {formatDistance(progress.walkedMeters)} walked
+        {t("stats", { stops: progress.stops, trips: progress.trips, dist: formatDistance(progress.walkedMeters) })}
       </p>
     </div>
   );

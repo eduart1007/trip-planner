@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 import { useEffect, useState } from "react";
 import type { Place } from "@/lib/types";
 import { formatDistance, formatDuration, type Leg } from "@/lib/routing";
@@ -15,12 +17,12 @@ function Countdown({ at }: { at: number }) {
   }, []);
 
   const left = at - now;
-  if (left <= 0) return <span className="font-semibold text-red-600 dark:text-red-400">leave now!</span>;
+  if (left <= 0) return <span className="font-semibold text-red-600 dark:text-red-400">{t("leaveNow")}</span>;
   const minutes = Math.floor(left / 60);
   const seconds = left % 60;
   return (
     <span>
-      in {minutes} min {String(seconds).padStart(2, "0")} s
+      {t("inTime", { min: minutes, sec: String(seconds).padStart(2, "0") })}
     </span>
   );
 }
@@ -76,21 +78,21 @@ export default function NavigationCard({
   if (done) {
     return (
       <div className={cardClass}>
-        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Trip complete 🎉</p>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">You earned {earned} points on this trip.</p>
+        <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{t("tripComplete")}</p>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t("earnedTrip", { n: earned })}</p>
         <button
           onClick={onStop}
           className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          Close
+          {t("close")}
         </button>
       </div>
     );
   }
 
-  let distanceLine = "Finding your location...";
+  let distanceLine = t("findingLocation");
   if (leg) distanceLine = `${formatDistance(leg.distance)} · ${formatDuration(leg.duration)}`;
-  else if (straightMeters !== null) distanceLine = `About ${formatDistance(straightMeters)} away`;
+  else if (straightMeters !== null) distanceLine = t("aboutAway", { d: formatDistance(straightMeters) });
 
   return (
     <div className={cardClass}>
@@ -99,13 +101,13 @@ export default function NavigationCard({
       {stop ? (
         <>
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-            Stop {index + 1} of {total}
+            {t("stopOf", { i: index + 1, n: total })}
           </p>
           <p className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">{stop.name}</p>
 
           {leaveAt !== null && leaveFrom && (
             <p className="mt-2 rounded-lg bg-amber-50 dark:bg-amber-950 p-2 text-sm text-amber-800 dark:text-amber-200">
-              Leave {leaveFrom} at <strong>{formatClock(leaveAt)}</strong> · <Countdown at={leaveAt} />
+              {t("leaveFromAt", { from: leaveFrom })} <strong>{formatClock(leaveAt)}</strong> · <Countdown at={leaveAt} />
             </p>
           )}
 
@@ -118,24 +120,24 @@ export default function NavigationCard({
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{distanceLine}</p>
           {arriveAt !== null && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Expected arrival {formatClock(arriveAt)}
+              {t("expectedArrival")} {formatClock(arriveAt)}
               {lateBySeconds > 0 && (
                 <span className="font-semibold text-red-600 dark:text-red-400">
                   {" "}
-                  · {Math.ceil(lateBySeconds / 60)} min late
+                  · {t("minLate", { n: Math.ceil(lateBySeconds / 60) })}
                 </span>
               )}
             </p>
           )}
           {accuracy !== null && accuracy > 100 && (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-              GPS signal is weak (accurate to about {Math.round(accuracy)} m).
+              {t("gpsWeak", { n: Math.round(accuracy) })}
             </p>
           )}
 
           {/* Running late and voice */}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-            <span>Running late?</span>
+            <span>{t("runningLate")}</span>
             {[10, 20, 30].map((m) => (
               <button
                 key={m}
@@ -147,7 +149,7 @@ export default function NavigationCard({
             ))}
             <button
               onClick={onToggleVoice}
-              aria-label={voiceOn ? "Turn voice off" : "Turn voice on"}
+              aria-label={voiceOn ? t("voiceOff") : t("voiceOn")}
               className="ml-auto text-lg leading-none"
             >
               {voiceOn ? "🔊" : "🔇"}
@@ -155,9 +157,9 @@ export default function NavigationCard({
           </div>
           {delayMinutes > 0 && (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-              Plan moved later by {delayMinutes} min.{" "}
+              {t("planMoved", { n: delayMinutes })}{" "}
               <button onClick={() => onDelay(-delayMinutes)} className="underline">
-                Undo
+                {t("undo")}
               </button>
             </p>
           )}
@@ -167,27 +169,27 @@ export default function NavigationCard({
               onClick={onSkip}
               className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              Skip stop
+              {t("skipStop")}
             </button>
             <button
               onClick={onStop}
               className="flex-1 rounded-lg border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
             >
-              Stop trip
+              {t("stopTrip")}
             </button>
           </div>
           <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
-            Skipping a stop earns no points.
+            {t("skipNote")}
           </p>
         </>
       ) : (
         <>
-          <p className="text-sm text-gray-700 dark:text-gray-300">There are no more stops.</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{t("noMoreStops")}</p>
           <button
             onClick={onStop}
             className="mt-3 w-full rounded-lg border border-red-300 dark:border-red-800 px-3 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
           >
-            Stop trip
+            {t("stopTrip")}
           </button>
         </>
       )}
