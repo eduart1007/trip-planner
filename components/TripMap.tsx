@@ -24,13 +24,15 @@ import {
   type StopState,
 } from "@/components/MapParts";
 import AccountPanel from "@/components/AccountPanel";
+import StatsPanel from "@/components/StatsPanel";
 import NavigationCard from "@/components/NavigationCard";
 import SettingsPanel from "@/components/SettingsPanel";
 import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { useUser } from "@/lib/auth";
-import { loadProfile, saveProfile } from "@/lib/cloud";
+import { earnedBadges, badgeLabel } from "@/lib/badges";
+import { loadProfile, mergeProgress, saveProfile } from "@/lib/cloud";
 import { distanceMeters } from "@/lib/geo";
 import { searchPlaces } from "@/lib/search";
 import { buildIcs, downloadFile, printTrip } from "@/lib/export";
@@ -52,6 +54,8 @@ import {
   pointsForLeg,
   saveProgress,
   EMPTY_PROGRESS,
+  todayKey,
+  withStreak,
   type Progress,
 } from "@/lib/rank";
 import { formatDistance, getRoute, type RouteResult, type TravelMode } from "@/lib/routing";
@@ -158,6 +162,7 @@ export default function TripMap() {
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
   const [showAccount, setShowAccount] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
   const [orderUndo, setOrderUndo] = useState<{ before: Place[]; after: string } | null>(null);
   const [orderNote, setOrderNote] = useState("");
@@ -276,14 +281,7 @@ export default function TripMap() {
     loadProfile(userId)
       .then((cloud) => {
         const local = progressRef.current;
-        const merged: Progress = cloud
-          ? {
-              points: Math.max(local.points, cloud.points),
-              stops: Math.max(local.stops, cloud.stops),
-              trips: Math.max(local.trips, cloud.trips),
-              walkedMeters: Math.max(local.walkedMeters, cloud.walked_meters),
-            }
-          : local;
+        const merged = mergeProgress(local, cloud);
         progressRef.current = merged;
         setProgress(merged);
         return saveProfile(userId, merged);
@@ -302,6 +300,25 @@ export default function TripMap() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [progress, userId, cloudUser]);
+
+  // A message when you earn a new badge
+  const badgesSeen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const earned = earnedBadges(progress);
+    if (badgesSeen.current === null) {
+      badgesSeen.current = new Set(earned.map((b) => b.id));
+      return;
+    }
+    const seen = badgesSeen.current;
+    const fresh = earned.filter((b) => !seen.has(b.id));
+    if (fresh.length === 0) return;
+    fresh.forEach((b) => seen.add(b.id));
+
+    const line = t("newBadge", { name: fresh.map((b) => badgeLabel(b)).join(", ") });
+    setReward((r) => (r ? { ...r, levelUp: r.levelUp ? `${r.levelUp} · ${line}` : line } : { text: line }));
+    if (rewardTimer.current) clearTimeout(rewardTimer.current);
+    rewardTimer.current = setTimeout(() => setReward(null), 6000);
+  }, [progress]);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -778,12 +795,13 @@ export default function TripMap() {
 
     if (reached) {
       const before = progressRef.current;
-      const after: Progress = {
+      const after: Progress = withStreak({
+        ...before,
         points: before.points + total,
         stops: before.stops + 1,
         trips: before.trips + (tripBonus > 0 ? 1 : 0),
         walkedMeters: before.walkedMeters + walked,
-      };
+      }, todayKey());
       progressRef.current = after;
       setProgress(after);
 
@@ -986,6 +1004,7 @@ export default function TripMap() {
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
         onOpenAccount={() => setShowAccount(true)}
+        onOpenStats={() => setShowStats(true)}
         onSearch={(q) =>
           searchPlaces(q, map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : undefined)
         }
@@ -1318,6 +1337,10 @@ export default function TripMap() {
       </div>
 
       {showGuide && <WelcomeGuide onClose={closeGuide} />}
+
+      {showStats && (
+        <StatsPanel progress={progress} signedIn={user !== null} onClose={() => setShowStats(false)} />
+      )}
 
       {showAccount && (
         <AccountPanel

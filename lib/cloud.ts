@@ -10,6 +10,16 @@ export type CloudProfile = {
   stops: number;
   trips: number;
   walked_meters: number;
+  streak: number;
+  best_streak: number;
+  last_day: string | null;
+};
+
+export type LeaderboardRow = {
+  rank: number;
+  display_name: string;
+  points: number;
+  is_me: boolean;
 };
 
 function client() {
@@ -43,11 +53,11 @@ export async function deleteTrip(id: string) {
   if (error) throw error;
 }
 
-// ---- Points and public name ----
+// ---- Points, streaks and public name ----
 export async function loadProfile(userId: string): Promise<CloudProfile | null> {
   const { data, error } = await client()
     .from("profiles")
-    .select("display_name, points, stops, trips, walked_meters")
+    .select("display_name, points, stops, trips, walked_meters, streak, best_streak, last_day")
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
@@ -62,6 +72,9 @@ export async function saveProfile(userId: string, progress: Progress) {
       stops: progress.stops,
       trips: progress.trips,
       walked_meters: progress.walkedMeters,
+      streak: progress.streak,
+      best_streak: progress.bestStreak,
+      last_day: progress.lastDay || null,
     },
     { onConflict: "user_id" }
   );
@@ -76,4 +89,39 @@ export async function saveDisplayName(userId: string, name: string) {
       { onConflict: "user_id" }
     );
   if (error) throw error;
+}
+
+// The progress on this device and in your account: keep the higher values
+export function mergeProgress(local: Progress, cloud: CloudProfile | null): Progress {
+  if (!cloud) return local;
+  const cloudDay = cloud.last_day ?? "";
+  const cloudIsNewer = cloudDay > local.lastDay;
+  const sameDay = cloudDay === local.lastDay;
+
+  return {
+    points: Math.max(local.points, cloud.points),
+    stops: Math.max(local.stops, cloud.stops),
+    trips: Math.max(local.trips, cloud.trips),
+    walkedMeters: Math.max(local.walkedMeters, cloud.walked_meters),
+    bestStreak: Math.max(local.bestStreak, cloud.best_streak),
+    streak: sameDay
+      ? Math.max(local.streak, cloud.streak)
+      : cloudIsNewer
+        ? cloud.streak
+        : local.streak,
+    lastDay: cloudIsNewer ? cloudDay : local.lastDay,
+  };
+}
+
+// ---- Leaderboard ----
+export async function fetchLeaderboard(): Promise<LeaderboardRow[]> {
+  const { data, error } = await client().rpc("leaderboard", { limit_count: 20 });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchMyRank(): Promise<number | null> {
+  const { data, error } = await client().rpc("my_rank");
+  if (error) throw error;
+  return data ?? null;
 }

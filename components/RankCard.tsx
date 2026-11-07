@@ -2,7 +2,7 @@
 
 import AccountIcon from "@/components/AccountIcon";
 import { t } from "@/lib/i18n";
-import { MAX_NAMED_LEVEL, POINTS_PER_KM, getLevel, type Progress } from "@/lib/rank";
+import { MAX_NAMED_LEVEL, POINTS_PER_KM, activeStreak, getLevel, type Progress } from "@/lib/rank";
 import { formatDistance } from "@/lib/routing";
 import { getSettings } from "@/lib/settings";
 
@@ -18,17 +18,27 @@ export default function RankCard({
   progress,
   onOpenSettings,
   onOpenAccount,
+  onOpenStats,
 }: {
   progress: Progress;
   onOpenSettings: () => void;
   onOpenAccount: () => void;
+  onOpenStats: () => void;
 }) {
   const { level, rank, next, fraction, toNext } = getLevel(progress.points);
+  const streak = activeStreak(progress);
   const nextLabel =
     next.level <= MAX_NAMED_LEVEL ? `${next.emoji} ${next.name}` : t("level", { n: next.level });
 
   return (
     <div className="relative bg-blue-600 p-4 text-white">
+      <button
+        onClick={onOpenStats}
+        aria-label={`${t("leaderboard")} / ${t("badges")}`}
+        className="absolute right-[4.75rem] top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
+      >
+        🏆
+      </button>
       <button
         onClick={onOpenAccount}
         aria-label={t("account")}
@@ -44,7 +54,7 @@ export default function RankCard({
         ⚙️
       </button>
 
-      <div className="flex items-center justify-between pr-20">
+      <div className="flex items-center justify-between pr-28">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
             {t("level", { n: level })}
@@ -75,6 +85,9 @@ export default function RankCard({
           foot: bigDistance(toNext / POINTS_PER_KM.foot),
         })}
       </p>
+      {streak > 0 && (
+        <p className="mt-1 text-xs font-medium text-amber-200">🔥 {t("streakDays", { n: streak })}</p>
+      )}
       <p className="mt-1 text-xs text-blue-100">
         {t("stats", {
           stops: progress.stops,

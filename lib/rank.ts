@@ -67,9 +67,20 @@ export type Progress = {
   stops: number;
   trips: number;
   walkedMeters: number;
+  streak: number; // days in a row
+  bestStreak: number;
+  lastDay: string; // last day you reached a stop, as 2026-11-07
 };
 
-export const EMPTY_PROGRESS: Progress = { points: 0, stops: 0, trips: 0, walkedMeters: 0 };
+export const EMPTY_PROGRESS: Progress = {
+  points: 0,
+  stops: 0,
+  trips: 0,
+  walkedMeters: 0,
+  streak: 0,
+  bestStreak: 0,
+  lastDay: "",
+};
 
 const STORAGE_KEY = "trip-planner-progress-v1";
 
@@ -89,4 +100,34 @@ export function saveProgress(progress: Progress) {
   } catch {
     // storage may be unavailable
   }
+}
+
+
+// ---- Streaks ----
+// Today as "2026-11-07" (your local date)
+export function todayKey(now = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function dayBefore(key: string) {
+  const [y, m, d] = key.split("-").map(Number);
+  return todayKey(new Date(y, m - 1, d - 1));
+}
+
+// Counts today as a travel day (you reached a stop): +1 if you travelled yesterday too, otherwise it starts again at 1
+export function withStreak(progress: Progress, today: string): Progress {
+  if (progress.lastDay === today) return progress;
+  const streak = progress.lastDay === dayBefore(today) ? progress.streak + 1 : 1;
+  return {
+    ...progress,
+    streak,
+    bestStreak: Math.max(progress.bestStreak, streak),
+    lastDay: today,
+  };
+}
+
+// The streak you have right now (it ends if you missed yesterday)
+export function activeStreak(progress: Progress, today = todayKey()) {
+  return progress.lastDay === today || progress.lastDay === dayBefore(today) ? progress.streak : 0;
 }

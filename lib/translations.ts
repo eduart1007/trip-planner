@@ -274,4 +274,23 @@ export const TRANSLATIONS = {
   signOut: { en: "Sign out", es: "Cerrar sesión", fr: "Se déconnecter", de: "Abmelden", pt: "Sair" },
   savedOk: { en: "Saved ✓", es: "Guardado ✓", fr: "Enregistré ✓", de: "Gespeichert ✓", pt: "Salvo ✓" },
   needStops: { en: "Add some stops first.", es: "Añade primero algunas paradas.", fr: "Ajoutez d’abord quelques étapes.", de: "Füge zuerst ein paar Stopps hinzu.", pt: "Adicione algumas paradas primeiro." },
+
+  // ---- Leaderboard, badges and streaks ----
+  leaderboard: { en: "Leaderboard", es: "Clasificación", fr: "Classement", de: "Bestenliste", pt: "Ranking" },
+  badges: { en: "Badges", es: "Insignias", fr: "Badges", de: "Abzeichen", pt: "Conquistas" },
+  streakDays: { en: "{n}-day streak", es: "Racha de {n} días", fr: "Série de {n} jours", de: "{n}-Tage-Serie", pt: "Sequência de {n} dias" },
+  bestStreak: { en: "Best streak: {n} days", es: "Mejor racha: {n} días", fr: "Meilleure série : {n} jours", de: "Beste Serie: {n} Tage", pt: "Melhor sequência: {n} dias" },
+  streakHint: { en: "Reach a stop every day to keep your streak.", es: "Llega a una parada cada día para mantener tu racha.", fr: "Atteignez une étape chaque jour pour garder votre série.", de: "Erreiche jeden Tag einen Stopp, um deine Serie zu halten.", pt: "Chegue a uma parada todos os dias para manter sua sequência." },
+  yourRank: { en: "Your rank: #{n}", es: "Tu posición: n.º {n}", fr: "Votre rang : n° {n}", de: "Dein Platz: {n}", pt: "Sua posição: nº {n}" },
+  noPlayers: { en: "No players yet. Be the first!", es: "Aún no hay jugadores. ¡Sé el primero!", fr: "Pas encore de joueurs. Soyez le premier !", de: "Noch keine Spieler. Sei der Erste!", pt: "Ainda não há jogadores. Seja o primeiro!" },
+  signInToCompete: { en: "Sign in and earn points to join the leaderboard.", es: "Inicia sesión y gana puntos para entrar en la clasificación.", fr: "Connectez-vous et gagnez des points pour entrer au classement.", de: "Melde dich an und sammle Punkte, um in die Bestenliste zu kommen.", pt: "Entre e ganhe pontos para aparecer no ranking." },
+  you: { en: "You", es: "Tú", fr: "Vous", de: "Du", pt: "Você" },
+  newBadge: { en: "New badge: {name}", es: "Nueva insignia: {name}", fr: "Nouveau badge : {name}", de: "Neues Abzeichen: {name}", pt: "Nova conquista: {name}" },
+  badgesCount: { en: "{n} of {total} badges", es: "{n} de {total} insignias", fr: "{n} badges sur {total}", de: "{n} von {total} Abzeichen", pt: "{n} de {total} conquistas" },
+  badgeStop1: { en: "First stop reached", es: "Primera parada alcanzada", fr: "Première étape atteinte", de: "Erster Stopp erreicht", pt: "Primeira parada alcançada" },
+  badgeTrip1: { en: "First trip finished", es: "Primer viaje completado", fr: "Premier voyage terminé", de: "Erste Reise abgeschlossen", pt: "Primeira viagem concluída" },
+  badgeStops: { en: "{n} stops reached", es: "{n} paradas alcanzadas", fr: "{n} étapes atteintes", de: "{n} Stopps erreicht", pt: "{n} paradas alcançadas" },
+  badgeTrips: { en: "{n} trips finished", es: "{n} viajes completados", fr: "{n} voyages terminés", de: "{n} Reisen abgeschlossen", pt: "{n} viagens concluídas" },
+  badgeWalk: { en: "{n} km walked", es: "{n} km a pie", fr: "{n} km à pied", de: "{n} km zu Fuß", pt: "{n} km a pé" },
+  badgeLevel: { en: "Reached level {n}", es: "Nivel {n} alcanzado", fr: "Niveau {n} atteint", de: "Level {n} erreicht", pt: "Nível {n} alcançado" },
 } satisfies Record<string, Entry>;
