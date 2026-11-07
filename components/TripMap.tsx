@@ -29,6 +29,7 @@ import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
+import { buildShareUrl, consumeSharedPlan } from "@/lib/share";
 import { guideSeen, markGuideSeen } from "@/lib/guide";
 import { CATEGORIES, findPlaces, prettify, type Category } from "@/lib/overpass";
 import { loadPlan, savePlan } from "@/lib/plan";
@@ -106,7 +107,11 @@ async function lookupAddress(lat: number, lon: number) {
 export default function TripMap() {
   const [initial] = useState(() => {
     setCurrentSettings(loadSettings()); // so the first texts use the saved language
-    return loadPlan();
+    const saved = loadPlan();
+    const shared = consumeSharedPlan(saved.trip.length > 0, t("sharedLoad"));
+    return shared
+      ? { ...saved, trip: shared.trip, startTime: shared.startTime, mode: shared.mode }
+      : saved;
   });
 
   const [map, setMap] = useState<L.Map | null>(null);
@@ -138,6 +143,7 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [shareNote, setShareNote] = useState("");
   const [myLocation, setMyLocation] = useState<UserPosition | null>(null);
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = loadSettings();
@@ -211,6 +217,13 @@ export default function TripMap() {
     if (map) locateMe(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
+
+  // Remove "#trip=..." from the address once a shared trip is open
+  useEffect(() => {
+    if (window.location.hash.startsWith("#trip=")) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, []);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -487,6 +500,45 @@ export default function TripMap() {
       // The first look-up on opening is quick and cheap; the button asks for a precise one
       { enableHighAccuracy: announce, timeout: 15000, maximumAge: announce ? 0 : 300000 }
     );
+  }
+
+  // Share the trip: the phone's share sheet, or a link copied to the clipboard
+  async function shareTrip() {
+    if (stops.length === 0) return;
+    const url = buildShareUrl({ trip: stops, startTime, mode });
+    const text = [
+      t("shareTitle"),
+      ...stops.map(
+        (s, i) => `${i + 1}. ${s.name}${schedule ? ` – ${formatClock(schedule.items[i].arriveAt)}` : ""}`
+      ),
+    ].join("\n");
+
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share({ title: t("shareTitle"), text, url });
+        return;
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return; // you closed the share sheet
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareNote(t("linkCopied"));
+      setTimeout(() => setShareNote(""), 2500);
+    } catch {
+      window.prompt(t("copyLink"), url);
+    }
+  }
+
+  // Remove all stops (the start point stays)
+  function clearRoute() {
+    if (navigating || stops.length === 0) return;
+    if (!window.confirm(t("clearConfirm"))) return;
+    setTrip([]);
+    setArrivals({});
+    setDelaySeconds(0);
+    setDropped(null);
   }
 
   function toggleVoice() {
@@ -792,6 +844,9 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        shareNote={shareNote}
+        onShare={shareTrip}
+        onClear={clearRoute}
         onOpenSettings={() => setShowSettings(true)}
         onRemove={removeFromTrip}
         onMove={moveStop}

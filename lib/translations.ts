@@ -98,7 +98,7 @@ export const TRANSLATIONS = {
   worth_foot: { en: "Worth {n}+ points on foot", es: "Vale {n}+ puntos a pie", fr: "Vaut {n}+ points à pied", de: "{n}+ Punkte zu Fuß", pt: "Vale {n}+ pontos a pé" },
   worth_bike: { en: "Worth {n}+ points by bike", es: "Vale {n}+ puntos en bici", fr: "Vaut {n}+ points à vélo", de: "{n}+ Punkte mit dem Rad", pt: "Vale {n}+ pontos de bicicleta" },
   worth_car: { en: "Worth {n}+ points by car", es: "Vale {n}+ puntos en coche", fr: "Vaut {n}+ points en voiture", de: "{n}+ Punkte mit dem Auto", pt: "Vale {n}+ pontos de carro" },
-  startTrip: { en: "Start trip (locks your plan)", es: "Iniciar viaje (bloquea tu plan)", fr: "Démarrer le voyage (verrouille votre plan)", de: "Reise starten (sperrt deinen Plan)", pt: "Iniciar viagem (trava seu plano)" },
+  startTrip: { en: "Start trip", es: "Iniciar viaje", fr: "Démarrer le voyage", de: "Reise starten", pt: "Iniciar viagem" },
   stopTrip: { en: "Stop trip", es: "Detener viaje", fr: "Arrêter le voyage", de: "Reise beenden", pt: "Parar viagem" },
   hintFail: { en: "Could not calculate travel times. Check your stops and try again.", es: "No se pudieron calcular los tiempos de viaje. Revisa tus paradas e inténtalo de nuevo.", fr: "Impossible de calculer les temps de trajet. Vérifiez vos étapes et réessayez.", de: "Die Fahrzeiten konnten nicht berechnet werden. Prüfe deine Stopps und versuche es erneut.", pt: "Não foi possível calcular os tempos de viagem. Verifique suas paradas e tente de novo." },
   hintCalc: { en: "Calculating travel times...", es: "Calculando los tiempos de viaje...", fr: "Calcul des temps de trajet…", de: "Fahrzeiten werden berechnet ...", pt: "Calculando os tempos de viagem..." },
@@ -208,4 +208,14 @@ export const TRANSLATIONS = {
   // ---- Time pickers ----
   hour: { en: "Hour", es: "Hora", fr: "Heure", de: "Stunde", pt: "Hora" },
   minute: { en: "Minute", es: "Minuto", fr: "Minute", de: "Minute", pt: "Minuto" },
+
+  // ---- Share, clear, levels ----
+  shareTrip: { en: "Share trip", es: "Compartir viaje", fr: "Partager le voyage", de: "Reise teilen", pt: "Compartilhar viagem" },
+  linkCopied: { en: "Link copied!", es: "¡Enlace copiado!", fr: "Lien copié !", de: "Link kopiert!", pt: "Link copiado!" },
+  shareTitle: { en: "My trip plan", es: "Mi plan de viaje", fr: "Mon plan de voyage", de: "Mein Reiseplan", pt: "Meu plano de viagem" },
+  copyLink: { en: "Copy this link to share your trip:", es: "Copia este enlace para compartir tu viaje:", fr: "Copiez ce lien pour partager votre voyage :", de: "Kopiere diesen Link, um deine Reise zu teilen:", pt: "Copie este link para compartilhar sua viagem:" },
+  clearRoute: { en: "Clear route", es: "Borrar ruta", fr: "Effacer l’itinéraire", de: "Route löschen", pt: "Limpar rota" },
+  clearConfirm: { en: "Remove all stops from this trip? Your start point stays.", es: "¿Quitar todas las paradas de este viaje? Tu punto de partida se mantiene.", fr: "Retirer toutes les étapes de ce voyage ? Votre point de départ est conservé.", de: "Alle Stopps dieser Reise entfernen? Dein Startpunkt bleibt erhalten.", pt: "Remover todas as paradas desta viagem? Seu ponto de partida será mantido." },
+  sharedLoad: { en: "Open the shared trip? It will replace the stops in your current plan.", es: "¿Abrir el viaje compartido? Reemplazará las paradas de tu plan actual.", fr: "Ouvrir le voyage partagé ? Il remplacera les étapes de votre plan actuel.", de: "Die geteilte Reise öffnen? Sie ersetzt die Stopps in deinem aktuellen Plan.", pt: "Abrir a viagem compartilhada? Ela substituirá as paradas do seu plano atual." },
+  equiv: { en: "≈ {car} by car · {bike} by bike · {foot} on foot", es: "≈ {car} en coche · {bike} en bici · {foot} a pie", fr: "≈ {car} en voiture · {bike} à vélo · {foot} à pied", de: "≈ {car} mit dem Auto · {bike} mit dem Rad · {foot} zu Fuß", pt: "≈ {car} de carro · {bike} de bicicleta · {foot} a pé" },
 } satisfies Record<string, Entry>;

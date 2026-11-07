@@ -16,32 +16,48 @@ export function pointsForLeg(meters: number, mode: TravelMode) {
   return STOP_BONUS + Math.round((meters / 1000) * POINTS_PER_KM[mode]);
 }
 
-// ---- Ranks ----
+// ---- Levels ----
 export const RANKS = [
-  { name: "Tripper", emoji: "🎒", min: 0 },
-  { name: "Wanderer", emoji: "🧭", min: 150 },
-  { name: "Explorer", emoji: "🗺️", min: 400 },
-  { name: "Pathfinder", emoji: "🥾", min: 900 },
-  { name: "Trailblazer", emoji: "🔥", min: 1800 },
-  { name: "Globetrotter", emoji: "🌍", min: 3500 },
-  { name: "Voyager", emoji: "⛵", min: 7000 },
-  { name: "Legend", emoji: "👑", min: 15000 },
+  { emoji: "🎒" },
+  { emoji: "🧭" },
+  { emoji: "🗺️" },
+  { emoji: "🥾" },
+  { emoji: "🔥" },
+  { emoji: "🌍" },
+  { emoji: "⛵" },
+  { emoji: "👑" },
 ];
 
+// After this level the rank stays "Legend" and only the level number grows
+export const MAX_NAMED_LEVEL = RANKS.length;
+
+const CAR = POINTS_PER_KM.car;
+
+// Points needed to reach a level, measured in kilometres driven (1 km by car = 10 points):
+// level 2 = 10,000 km, level 3 = 25,000 km, level 4 = 50,000 km, then +50,000 km per level
+export function pointsForLevel(level: number) {
+  if (level <= 1) return 0;
+  if (level === 2) return 10000 * CAR;
+  if (level === 3) return 25000 * CAR;
+  return (level - 3) * 50000 * CAR;
+}
+
+function rankFor(level: number) {
+  const index = Math.min(level, MAX_NAMED_LEVEL) - 1;
+  return { emoji: RANKS[index].emoji, name: t(`rank${index}` as TKey) };
+}
+
 export function getLevel(points: number) {
-  let index = 0;
-  RANKS.forEach((r, i) => {
-    if (points >= r.min) index = i;
-  });
-  const rank = { ...RANKS[index], name: t(`rank${index}` as TKey) };
-  const nextBase = RANKS[index + 1];
-  const next = nextBase ? { ...nextBase, name: t(`rank${index + 1}` as TKey) } : null;
+  let level = 1;
+  while (points >= pointsForLevel(level + 1)) level++;
+  const start = pointsForLevel(level);
+  const end = pointsForLevel(level + 1);
   return {
-    level: index + 1,
-    rank,
-    next,
-    fraction: next ? (points - rank.min) / (next.min - rank.min) : 1,
-    toNext: next ? next.min - points : 0,
+    level,
+    rank: rankFor(level),
+    next: { level: level + 1, ...rankFor(level + 1) },
+    fraction: (points - start) / (end - start),
+    toNext: end - points,
   };
 }
 

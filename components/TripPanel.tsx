@@ -44,6 +44,9 @@ type Props = {
   visibleOnMobile: boolean;
   onOpenSettings: () => void;
   weather: (StopWeather | null)[];
+  shareNote: string;
+  onShare: () => void;
+  onClear: () => void;
   progress: Progress;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -73,6 +76,9 @@ export default function TripPanel({
   visibleOnMobile,
   onOpenSettings,
   weather,
+  shareNote,
+  onShare,
+  onClear,
   progress,
   onRemove,
   onMove,
@@ -378,6 +384,23 @@ export default function TripPanel({
             🏆 {t(WORTH_KEYS[mode], { n: tripPoints })}
           </p>
         )}
+
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={onShare}
+            disabled={trip.length === 0}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {shareNote || `🔗 ${t("shareTrip")}`}
+          </button>
+          <button
+            onClick={onClear}
+            disabled={locked || trip.length === 0}
+            className="flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+          >
+            🗑 {t("clearRoute")}
+          </button>
+        </div>
 
         {locked ? (
           <button

@@ -1,9 +1,17 @@
 "use client";
 
 import { t } from "@/lib/i18n";
-
-import { getLevel, type Progress } from "@/lib/rank";
+import { MAX_NAMED_LEVEL, POINTS_PER_KM, getLevel, type Progress } from "@/lib/rank";
 import { formatDistance } from "@/lib/routing";
+import { getSettings } from "@/lib/settings";
+
+// A long distance such as "3,200 km" (or miles)
+function bigDistance(km: number) {
+  const miles = getSettings().units === "mi";
+  const value = miles ? km / 1.609344 : km;
+  const text = value < 10 ? value.toFixed(1) : Math.round(value).toLocaleString();
+  return `${text} ${miles ? "mi" : "km"}`;
+}
 
 export default function RankCard({
   progress,
@@ -13,6 +21,8 @@ export default function RankCard({
   onOpenSettings: () => void;
 }) {
   const { level, rank, next, fraction, toNext } = getLevel(progress.points);
+  const nextLabel =
+    next.level <= MAX_NAMED_LEVEL ? `${next.emoji} ${next.name}` : t("level", { n: next.level });
 
   return (
     <div className="relative bg-blue-600 p-4 text-white">
@@ -34,7 +44,7 @@ export default function RankCard({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold leading-none">{progress.points}</p>
+          <p className="text-2xl font-bold leading-none">{progress.points.toLocaleString()}</p>
           <p className="text-xs text-blue-100">{t("points")}</p>
         </div>
       </div>
@@ -42,14 +52,25 @@ export default function RankCard({
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/30">
         <div
           className="h-full rounded-full bg-amber-300 transition-all"
-          style={{ width: `${Math.round(fraction * 100)}%` }}
+          style={{ width: `${Math.max(1, Math.round(fraction * 100))}%` }}
         />
       </div>
       <p className="mt-1 text-xs text-blue-100">
-        {next ? t("pointsTo", { n: toNext, rank: next.name }) : t("topRank")}
+        {t("pointsTo", { n: toNext.toLocaleString(), rank: nextLabel })}
       </p>
       <p className="mt-1 text-xs text-blue-100">
-        {t("stats", { stops: progress.stops, trips: progress.trips, dist: formatDistance(progress.walkedMeters) })}
+        {t("equiv", {
+          car: bigDistance(toNext / POINTS_PER_KM.car),
+          bike: bigDistance(toNext / POINTS_PER_KM.bike),
+          foot: bigDistance(toNext / POINTS_PER_KM.foot),
+        })}
+      </p>
+      <p className="mt-1 text-xs text-blue-100">
+        {t("stats", {
+          stops: progress.stops,
+          trips: progress.trips,
+          dist: formatDistance(progress.walkedMeters),
+        })}
       </p>
     </div>
   );
