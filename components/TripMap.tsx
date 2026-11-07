@@ -10,6 +10,7 @@ import {
   Polyline,
   Popup,
   TileLayer,
+  ZoomControl,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -100,6 +101,7 @@ export default function TripMap() {
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Tip: click anywhere on the map to drop a pin.");
+  const [tab, setTab] = useState<"plan" | "map">("map"); // phone: which view is showing
 
   // The plan (saved in this browser)
   const [home, setHome] = useState<Place | null>(initial.home);
@@ -153,6 +155,20 @@ export default function TripMap() {
   useEffect(() => {
     if (map && selected) map.flyTo([selected.lat, selected.lon], 15);
   }, [map, selected]);
+
+  // Leaflet must re-measure the map when it becomes visible again (phone tabs)
+  useEffect(() => {
+    if (!map) return;
+    const timer = setTimeout(() => map.invalidateSize(), 50);
+    return () => clearTimeout(timer);
+  }, [map, tab]);
+
+  // Hide messages after a few seconds so they do not cover the map
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(""), 8000);
+    return () => clearTimeout(timer);
+  }, [message]);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -463,6 +479,7 @@ export default function TripMap() {
 
     // Needed so the browser allows sound and notifications later
     prepareAlarm();
+    setTab("map");
 
     stopWatching();
     const run = latest.current;
@@ -608,7 +625,7 @@ export default function TripMap() {
   }
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full flex-col md:flex-row">
       <TripPanel
         trip={stops}
         home={home}
@@ -623,6 +640,7 @@ export default function TripMap() {
         currentIndex={navIndex}
         canStart={canStart}
         progress={progress}
+        visibleOnMobile={tab === "plan"}
         onRemove={removeFromTrip}
         onMove={moveStop}
         onUpdate={updateStop}
@@ -635,9 +653,11 @@ export default function TripMap() {
         onStop={stopTrip}
       />
 
-      <div className="relative h-full min-w-0 flex-1">
+      <div
+        className={`relative min-h-0 min-w-0 flex-1 md:block ${tab === "map" ? "block" : "hidden"}`}
+      >
         {/* Search panel on top of the map */}
-        <div className="absolute left-4 top-4 z-[1000] w-80 max-w-[calc(100%-2rem)]">
+        <div className="absolute left-3 right-3 top-3 z-[1000] md:left-4 md:right-auto md:top-4 md:w-80">
           <form onSubmit={handleSearch} className="flex gap-2">
             <input
               value={query}
@@ -654,8 +674,8 @@ export default function TripMap() {
             </button>
           </form>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-xs text-gray-600 shadow-md">
+          <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto py-1 md:flex-wrap md:overflow-visible">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs text-gray-600 shadow-md">
               Search this area:
             </span>
             {CATEGORIES.map((c) => (
@@ -663,7 +683,7 @@ export default function TripMap() {
                 key={c.id}
                 onClick={() => handleCategory(c.id)}
                 disabled={loading}
-                className={`rounded-full px-3 py-1 text-xs font-medium shadow-md disabled:opacity-60 ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium shadow-md disabled:opacity-60 ${
                   activeCategory === c.id
                     ? "bg-blue-600 text-white"
                     : "bg-white text-gray-800 hover:bg-gray-100"
@@ -681,7 +701,7 @@ export default function TripMap() {
           )}
 
           {results.length > 0 && (
-            <ul className="mt-2 max-h-72 overflow-y-auto rounded-lg bg-white shadow-md">
+            <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white shadow-md md:max-h-72">
               {results.map((place) => (
                 <li key={place.id}>
                   <button
@@ -749,13 +769,15 @@ export default function TripMap() {
         <MapContainer
           center={[48.8566, 2.3522]}
           zoom={13}
-          style={{ height: "100%", width: "100%" }}
+          style={{ position: "absolute", inset: 0 }}
+          zoomControl={false}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapBridge onReady={setMap} />
+          <ZoomControl position="topright" />
           <ClickHandler onPick={handlePick} disabled={navigating} />
 
           {/* The route line from the start through all stops (faded during a trip) */}
@@ -896,6 +918,26 @@ export default function TripMap() {
           ))}
         </MapContainer>
       </div>
+
+      {/* Phone: switch between the plan and the map */}
+      <nav className="flex shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+        <button
+          onClick={() => setTab("plan")}
+          className={`flex-1 py-3 text-sm font-medium ${
+            tab === "plan" ? "bg-blue-50 text-blue-700" : "text-gray-500"
+          }`}
+        >
+          📋 Plan{stops.length > 0 ? ` (${stops.length})` : ""}
+        </button>
+        <button
+          onClick={() => setTab("map")}
+          className={`flex-1 py-3 text-sm font-medium ${
+            tab === "map" ? "bg-blue-50 text-blue-700" : "text-gray-500"
+          }`}
+        >
+          🗺️ Map
+        </button>
+      </nav>
     </div>
   );
 }

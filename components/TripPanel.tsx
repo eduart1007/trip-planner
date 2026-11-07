@@ -40,6 +40,7 @@ type Props = {
   locked: boolean; // true while a trip is running
   currentIndex: number;
   canStart: boolean;
+  visibleOnMobile: boolean;
   progress: Progress;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -66,6 +67,7 @@ export default function TripPanel({
   locked,
   currentIndex,
   canStart,
+  visibleOnMobile,
   progress,
   onRemove,
   onMove,
@@ -115,7 +117,9 @@ export default function TripPanel({
   }
 
   return (
-    <aside className="flex h-full w-[22rem] shrink-0 flex-col border-r border-gray-200 bg-white">
+    <aside
+      className={`${visibleOnMobile ? "block" : "hidden"} min-h-0 w-full flex-1 overflow-y-auto border-r border-gray-200 bg-white md:flex md:w-[22rem] md:flex-none md:shrink-0 md:flex-col md:overflow-visible`}
+    >
       <RankCard progress={progress} />
 
       {/* Start point and leave time */}
@@ -177,11 +181,11 @@ export default function TripPanel({
       </div>
 
       {trip.length === 0 ? (
-        <p className="flex-1 p-4 text-sm text-gray-500">
+        <p className="p-4 text-sm text-gray-500 md:flex-1">
           Search the map, click a pin, or click anywhere on the map, then press Add to trip.
         </p>
       ) : (
-        <ol className="flex-1 overflow-y-auto">
+        <ol className="md:flex-1 md:overflow-y-auto">
           {trip.map((place, i) => {
             const prev = i === 0 ? home : trip[i - 1];
             const legIndex = home ? i : i - 1;

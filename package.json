@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "botid": "^1.5.12",
     "leaflet": "^1.9.4",
     "next": "16.4.5",
     "react": "19.3.0",
@@ -22,7 +24,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.5",
+    "eslint-config-next": "^15.5.29",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

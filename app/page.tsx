@@ -7,7 +7,7 @@ const TripMap = dynamic(() => import("@/components/TripMap"), { ssr: false });
 
 export default function Home() {
   return (
-    <main className="h-screen w-screen">
+    <main className="h-dvh w-screen">
       <TripMap />
     </main>
   );
