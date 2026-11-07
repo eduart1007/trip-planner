@@ -49,6 +49,7 @@ type Props = {
   progress: Progress;
   visibleOnMobile: boolean;
   onOpenSettings: () => void;
+  onOpenAccount: () => void;
   weather: (StopWeather | null)[];
   shareNote: string;
   onShare: () => void;
@@ -92,6 +93,7 @@ export default function TripPanel({
   progress,
   visibleOnMobile,
   onOpenSettings,
+  onOpenAccount,
   weather,
   shareNote,
   onShare,
@@ -212,7 +214,7 @@ export default function TripPanel({
     >
       {/* Everything here scrolls together, so the stops always have room */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <RankCard progress={progress} onOpenSettings={onOpenSettings} />
+        <RankCard progress={progress} onOpenSettings={onOpenSettings} onOpenAccount={onOpenAccount} />
 
         {/* Start point and leave time */}
         <div className="border-b border-gray-200 p-4 dark:border-gray-700">

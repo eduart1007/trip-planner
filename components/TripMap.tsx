@@ -23,11 +23,14 @@ import {
   stopIcon,
   type StopState,
 } from "@/components/MapParts";
+import AccountPanel from "@/components/AccountPanel";
 import NavigationCard from "@/components/NavigationCard";
 import SettingsPanel from "@/components/SettingsPanel";
 import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
+import { useUser } from "@/lib/auth";
+import { loadProfile, saveProfile } from "@/lib/cloud";
 import { distanceMeters } from "@/lib/geo";
 import { searchPlaces } from "@/lib/search";
 import { buildIcs, downloadFile, printTrip } from "@/lib/export";
@@ -41,13 +44,14 @@ import {
   prettify,
   type Category,
 } from "@/lib/overpass";
-import { loadPlan, savePlan } from "@/lib/plan";
+import { loadPlan, savePlan, type SavedPlan } from "@/lib/plan";
 import {
   TRIP_BONUS,
   getLevel,
   loadProgress,
   pointsForLeg,
   saveProgress,
+  EMPTY_PROGRESS,
   type Progress,
 } from "@/lib/rank";
 import { formatDistance, getRoute, type RouteResult, type TravelMode } from "@/lib/routing";
@@ -153,6 +157,8 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [showAccount, setShowAccount] = useState(false);
+  const [cloudUser, setCloudUser] = useState<string | null>(null);
   const [orderUndo, setOrderUndo] = useState<{ before: Place[]; after: string } | null>(null);
   const [orderNote, setOrderNote] = useState("");
   const [suggestions, setSuggestions] = useState<Place[]>([]);
@@ -259,6 +265,43 @@ export default function TripMap() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suggestionKey]);
+
+  // ---- Account: keep your points in your account ----
+  const user = useUser();
+  const userId = user?.id ?? null;
+
+  // When you sign in: combine the points on this device with the ones in your account
+  useEffect(() => {
+    if (!userId) return;
+    loadProfile(userId)
+      .then((cloud) => {
+        const local = progressRef.current;
+        const merged: Progress = cloud
+          ? {
+              points: Math.max(local.points, cloud.points),
+              stops: Math.max(local.stops, cloud.stops),
+              trips: Math.max(local.trips, cloud.trips),
+              walkedMeters: Math.max(local.walkedMeters, cloud.walked_meters),
+            }
+          : local;
+        progressRef.current = merged;
+        setProgress(merged);
+        return saveProfile(userId, merged);
+      })
+      .then(() => setCloudUser(userId))
+      .catch(() => {
+        // the app keeps working without the account
+      });
+  }, [userId]);
+
+  // Save changes of your points to your account
+  useEffect(() => {
+    if (!userId || cloudUser !== userId) return;
+    const timer = setTimeout(() => {
+      saveProfile(userId, progress).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [progress, userId, cloudUser]);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -620,6 +663,24 @@ export default function TripMap() {
     if (!opened) window.alert(t("popupBlocked"));
   }
 
+  // Open a trip saved in your account
+  function openCloudTrip(plan: SavedPlan) {
+    if (navigating) stopTrip();
+    setHome(plan.home ?? null);
+    setTrip(plan.trip);
+    setStartTime(plan.startTime);
+    setMode(plan.mode);
+    setArrivals({});
+    setDelaySeconds(0);
+    setShowAccount(false);
+  }
+
+  // Signing out also clears the points on this device, so they do not carry over to another account
+  function handleSignedOut() {
+    progressRef.current = EMPTY_PROGRESS;
+    setProgress(EMPTY_PROGRESS);
+  }
+
   function toggleVoice() {
     const next = !voiceOn;
     setVoiceOn(next);
@@ -924,6 +985,7 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        onOpenAccount={() => setShowAccount(true)}
         onSearch={(q) =>
           searchPlaces(q, map ? { lat: map.getCenter().lat, lon: map.getCenter().lng } : undefined)
         }
@@ -1256,6 +1318,16 @@ export default function TripMap() {
       </div>
 
       {showGuide && <WelcomeGuide onClose={closeGuide} />}
+
+      {showAccount && (
+        <AccountPanel
+          user={user}
+          plan={{ home, trip, startTime, mode }}
+          onLoad={openCloudTrip}
+          onSignedOut={handleSignedOut}
+          onClose={() => setShowAccount(false)}
+        />
+      )}
 
       {showSettings && (
         <SettingsPanel

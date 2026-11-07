@@ -16,9 +16,11 @@ function bigDistance(km: number) {
 export default function RankCard({
   progress,
   onOpenSettings,
+  onOpenAccount,
 }: {
   progress: Progress;
   onOpenSettings: () => void;
+  onOpenAccount: () => void;
 }) {
   const { level, rank, next, fraction, toNext } = getLevel(progress.points);
   const nextLabel =
@@ -27,6 +29,13 @@ export default function RankCard({
   return (
     <div className="relative bg-blue-600 p-4 text-white">
       <button
+        onClick={onOpenAccount}
+        aria-label={t("account")}
+        className="absolute right-11 top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
+      >
+        👤
+      </button>
+      <button
         onClick={onOpenSettings}
         aria-label={t("settings")}
         className="absolute right-3 top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
@@ -34,7 +43,7 @@ export default function RankCard({
         ⚙️
       </button>
 
-      <div className="flex items-center justify-between pr-10">
+      <div className="flex items-center justify-between pr-20">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
             {t("level", { n: level })}
