@@ -43,3 +43,45 @@ body {
     display: none;
   }
 }
+
+
+/* Dark mode and text size (settings) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Dark map */
+html.dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+html.dark .leaflet-container {
+  background: #1f2937;
+}
+html.dark .leaflet-popup-content-wrapper,
+html.dark .leaflet-popup-tip {
+  background: #1f2937;
+  color: #f3f4f6;
+}
+html.dark .leaflet-control-zoom a {
+  background: #1f2937;
+  color: #f3f4f6;
+  border-color: #374151;
+}
+html.dark .leaflet-control-attribution {
+  background: rgba(17, 24, 39, 0.8);
+  color: #9ca3af;
+}
+html.dark .leaflet-control-attribution a {
+  color: #93c5fd;
+}
+
+/* Fields keep a readable size on phones, even with large text */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
+}

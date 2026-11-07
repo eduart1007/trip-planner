@@ -1,3 +1,4 @@
+import { getSettings } from "./settings";
 import type { Place } from "./types";
 
 export const DEFAULT_STAY_MINUTES = 30;
@@ -16,7 +17,11 @@ export function formatClock(seconds: number) {
   const s = ((Math.round(seconds) % 86400) + 86400) % 86400;
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  const text = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const mm = String(m).padStart(2, "0");
+  const text =
+    getSettings().clock === "12h"
+      ? `${h % 12 === 0 ? 12 : h % 12}:${mm} ${h < 12 ? "AM" : "PM"}`
+      : `${String(h).padStart(2, "0")}:${mm}`;
   return day > 0 ? `${text} +${day}d` : text;
 }
 

@@ -1,3 +1,5 @@
+import { getSettings } from "./settings";
+
 export type TravelMode = "foot" | "bike" | "car";
 
 export const MODES: { id: TravelMode; label: string; icon: string }[] = [
@@ -95,6 +97,10 @@ export async function getRoute(
 }
 
 export function formatDistance(meters: number) {
+  if (getSettings().units === "mi") {
+    const feet = meters * 3.28084;
+    return feet < 500 ? `${Math.round(feet / 10) * 10} ft` : `${(meters / 1609.344).toFixed(1)} mi`;
+  }
   return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
 }
 

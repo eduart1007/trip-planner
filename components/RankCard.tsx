@@ -1,13 +1,28 @@
 "use client";
 
 import { getLevel, type Progress } from "@/lib/rank";
+import { formatDistance } from "@/lib/routing";
 
-export default function RankCard({ progress }: { progress: Progress }) {
+export default function RankCard({
+  progress,
+  onOpenSettings,
+}: {
+  progress: Progress;
+  onOpenSettings: () => void;
+}) {
   const { level, rank, next, fraction, toNext } = getLevel(progress.points);
 
   return (
-    <div className="bg-blue-600 p-4 text-white">
-      <div className="flex items-center justify-between">
+    <div className="relative bg-blue-600 p-4 text-white">
+      <button
+        onClick={onOpenSettings}
+        aria-label="Settings"
+        className="absolute right-3 top-3 rounded-full p-1.5 text-lg leading-none hover:bg-white/20"
+      >
+        ⚙️
+      </button>
+
+      <div className="flex items-center justify-between pr-10">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-100">
             Level {level}
@@ -32,7 +47,7 @@ export default function RankCard({ progress }: { progress: Progress }) {
         {next ? `${toNext} points to ${next.name}` : "Top rank reached!"}
       </p>
       <p className="mt-1 text-xs text-blue-100">
-        {progress.stops} stops · {progress.trips} trips · {(progress.walkedMeters / 1000).toFixed(1)} km walked
+        {progress.stops} stops · {progress.trips} trips · {formatDistance(progress.walkedMeters)} walked
       </p>
     </div>
   );

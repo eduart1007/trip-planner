@@ -22,6 +22,7 @@ import {
   type StopState,
 } from "@/components/MapParts";
 import NavigationCard from "@/components/NavigationCard";
+import SettingsPanel from "@/components/SettingsPanel";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
@@ -36,8 +37,16 @@ import {
   type Progress,
 } from "@/lib/rank";
 import { formatDistance, getRoute, type RouteResult, type TravelMode } from "@/lib/routing";
-import { computeSchedule, secondsNow, toSeconds, type Schedule } from "@/lib/schedule";
+import { computeSchedule, formatClock, secondsNow, toSeconds, type Schedule } from "@/lib/schedule";
 import type { Place } from "@/lib/types";
+import {
+  applySettings,
+  loadSettings,
+  saveSettings,
+  setCurrentSettings,
+  spokenDistance,
+  type Settings,
+} from "@/lib/settings";
 import { fetchWeather, pickHour, type HourlyWeather } from "@/lib/weather";
 
 type NominatimResult = {
@@ -122,6 +131,12 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [settings, setSettings] = useState<Settings>(() => {
+    const saved = loadSettings();
+    setCurrentSettings(saved);
+    return saved;
+  });
+  const [showSettings, setShowSettings] = useState(false);
   const [delaySeconds, setDelaySeconds] = useState(0);
   const [weather, setWeather] = useState<{ key: string; data: HourlyWeather[] } | null>(null);
 
@@ -174,6 +189,12 @@ export default function TripMap() {
     const timer = setTimeout(() => setMessage(""), 8000);
     return () => clearTimeout(timer);
   }, [message]);
+
+  // Apply the settings (dark mode, text size) to the page
+  useEffect(() => {
+    applySettings(settings);
+    map?.invalidateSize();
+  }, [settings, map]);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -344,9 +365,9 @@ export default function TripMap() {
       speak(arriving ? "Your stop is just ahead" : nextStep.text);
     } else if (!spoken.current.has(`${base}|far`)) {
       spoken.current.add(`${base}|far`);
-      const rounded = Math.max(10, Math.round(meters / 10) * 10);
+      const how = spokenDistance(meters);
       const text = nextStep.text.charAt(0).toLowerCase() + nextStep.text.slice(1);
-      speak(arriving ? `Your stop is in ${rounded} meters` : `In ${rounded} meters, ${text}`);
+      speak(arriving ? `Your stop is in ${how}` : `In ${how}, ${text}`);
     }
   }, [navigating, voiceOn, nextStep, position, navIndex]);
 
@@ -407,6 +428,13 @@ export default function TripMap() {
       () => setMessage("Could not get your location. Allow location access and try again."),
       { enableHighAccuracy: true, timeout: 15000 }
     );
+  }
+
+  function changeSettings(patch: Partial<Settings>) {
+    const next = { ...settings, ...patch };
+    setCurrentSettings(next); // so distances and times use it right away
+    saveSettings(next);
+    setSettings(next);
   }
 
   function toggleVoice() {
@@ -712,6 +740,7 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        onOpenSettings={() => setShowSettings(true)}
         onRemove={removeFromTrip}
         onMove={moveStop}
         onUpdate={updateStop}
@@ -734,7 +763,7 @@ export default function TripMap() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search a place, e.g. Eiffel Tower"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-md outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-md outline-none focus:border-blue-500"
             />
             <button
               type="submit"
@@ -746,7 +775,7 @@ export default function TripMap() {
           </form>
 
           <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto py-1 md:flex-wrap md:overflow-visible">
-            <span className="shrink-0 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs text-gray-600 shadow-md">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-white dark:bg-gray-900 px-3 py-1 text-xs text-gray-600 dark:text-gray-400 shadow-md">
               Search this area:
             </span>
             {CATEGORIES.map((c) => (
@@ -757,7 +786,7 @@ export default function TripMap() {
                 className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium shadow-md disabled:opacity-60 ${
                   activeCategory === c.id
                     ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-800 hover:bg-gray-100"
+                    : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 {c.label}
@@ -766,23 +795,23 @@ export default function TripMap() {
           </div>
 
           {message && (
-            <p className="mt-2 rounded-lg bg-white p-3 text-sm text-gray-700 shadow-md">
+            <p className="mt-2 rounded-lg bg-white dark:bg-gray-900 p-3 text-sm text-gray-700 dark:text-gray-300 shadow-md">
               {message}
             </p>
           )}
 
           {results.length > 0 && (
-            <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white shadow-md md:max-h-72">
+            <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white dark:bg-gray-900 shadow-md md:max-h-72">
               {results.map((place) => (
                 <li key={place.id}>
                   <button
                     onClick={() => setSelected(place)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                      selected?.id === place.id ? "bg-blue-50" : ""
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                      selected?.id === place.id ? "bg-blue-50 dark:bg-blue-950" : ""
                     }`}
                   >
-                    <span className="block font-medium text-gray-900">{place.name}</span>
-                    <span className="block truncate text-xs text-gray-500">
+                    <span className="block font-medium text-gray-900 dark:text-gray-100">{place.name}</span>
+                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
                       {place.address}
                     </span>
                   </button>
@@ -798,7 +827,7 @@ export default function TripMap() {
             <p className="text-lg font-bold">⏰ {alarm}</p>
             <button
               onClick={() => setAlarm(null)}
-              className="mt-2 rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+              className="mt-2 rounded-lg bg-white dark:bg-gray-900 px-4 py-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
             >
               Got it
             </button>
@@ -807,10 +836,10 @@ export default function TripMap() {
 
         {/* Points and level-up message */}
         {reward && !alarm && (
-          <div className="absolute left-1/2 top-4 z-[1100] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-white p-4 text-center shadow-xl">
-            <p className="text-base font-bold text-green-600">{reward.text}</p>
+          <div className="absolute left-1/2 top-4 z-[1100] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-white dark:bg-gray-900 p-4 text-center shadow-xl">
+            <p className="text-base font-bold text-green-600 dark:text-green-400">{reward.text}</p>
             {reward.levelUp && (
-              <p className="mt-1 text-base font-semibold text-amber-600">{reward.levelUp}</p>
+              <p className="mt-1 text-base font-semibold text-amber-600 dark:text-amber-400">{reward.levelUp}</p>
             )}
           </div>
         )}
@@ -970,7 +999,7 @@ export default function TripMap() {
                 {place.arriveBy && (
                   <>
                     <br />
-                    <span>Be there at {place.arriveBy}</span>
+                    <span>Be there at {formatClock(toSeconds(place.arriveBy) ?? 0)}</span>
                   </>
                 )}
                 <br />
@@ -994,12 +1023,20 @@ export default function TripMap() {
         </MapContainer>
       </div>
 
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onChange={changeSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
       {/* Phone: switch between the plan and the map */}
-      <nav className="flex shrink-0 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="flex shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pb-[env(safe-area-inset-bottom)] md:hidden">
         <button
           onClick={() => setTab("plan")}
           className={`flex-1 py-3 text-sm font-medium ${
-            tab === "plan" ? "bg-blue-50 text-blue-700" : "text-gray-500"
+            tab === "plan" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
           }`}
         >
           📋 Plan{stops.length > 0 ? ` (${stops.length})` : ""}
@@ -1007,7 +1044,7 @@ export default function TripMap() {
         <button
           onClick={() => setTab("map")}
           className={`flex-1 py-3 text-sm font-medium ${
-            tab === "map" ? "bg-blue-50 text-blue-700" : "text-gray-500"
+            tab === "map" ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300" : "text-gray-500 dark:text-gray-400"
           }`}
         >
           🗺️ Map
