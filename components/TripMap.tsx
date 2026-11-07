@@ -23,9 +23,11 @@ import {
 } from "@/components/MapParts";
 import NavigationCard from "@/components/NavigationCard";
 import SettingsPanel from "@/components/SettingsPanel";
+import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
+import { guideSeen, markGuideSeen } from "@/lib/guide";
 import { CATEGORIES, findPlaces, prettify, type Category } from "@/lib/overpass";
 import { loadPlan, savePlan } from "@/lib/plan";
 import {
@@ -137,6 +139,7 @@ export default function TripMap() {
     return saved;
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(() => !guideSeen());
   const [delaySeconds, setDelaySeconds] = useState(0);
   const [weather, setWeather] = useState<{ key: string; data: HourlyWeather[] } | null>(null);
 
@@ -428,6 +431,11 @@ export default function TripMap() {
       () => setMessage("Could not get your location. Allow location access and try again."),
       { enableHighAccuracy: true, timeout: 15000 }
     );
+  }
+
+  function closeGuide() {
+    markGuideSeen();
+    setShowGuide(false);
   }
 
   function changeSettings(patch: Partial<Settings>) {
@@ -1023,11 +1031,17 @@ export default function TripMap() {
         </MapContainer>
       </div>
 
+      {showGuide && <WelcomeGuide onClose={closeGuide} />}
+
       {showSettings && (
         <SettingsPanel
           settings={settings}
           onChange={changeSettings}
           onClose={() => setShowSettings(false)}
+          onOpenGuide={() => {
+            setShowSettings(false);
+            setShowGuide(true);
+          }}
         />
       )}
 

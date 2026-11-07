@@ -36,10 +36,12 @@ export default function SettingsPanel({
   settings,
   onChange,
   onClose,
+  onOpenGuide,
 }: {
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
   onClose: () => void;
+  onOpenGuide: () => void;
 }) {
   return (
     <div
@@ -106,8 +108,15 @@ export default function SettingsPanel({
         />
 
         <p className="mt-5 text-xs text-gray-500 dark:text-gray-400">
-          Language choice and a first-time guide are coming soon.
+          Language choice is coming soon.
         </p>
+
+        <button
+          onClick={onOpenGuide}
+          className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
+          📖 Show the guide again
+        </button>
 
         <button
           onClick={onClose}

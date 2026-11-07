@@ -173,6 +173,9 @@ export default function TripPanel({
             disabled={locked}
           />
         </div>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Earliest time you can leave. A “Be there at” time can make it later.
+        </p>
       </div>
 
       <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
@@ -291,7 +294,7 @@ export default function TripPanel({
                         min
                       </label>
                       <div className="flex items-center gap-1">
-                        <span>Be there at</span>
+                        <span title="The time you want to arrive. The app plans when to leave so you are there on time.">Be there at</span>
                         <TimeSelect
                           value={place.arriveBy}
                           onChange={(t) => onUpdate(place.id, { arriveBy: t })}
