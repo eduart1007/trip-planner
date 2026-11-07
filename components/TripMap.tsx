@@ -23,7 +23,7 @@ import {
 } from "@/components/MapParts";
 import NavigationCard from "@/components/NavigationCard";
 import TripPanel from "@/components/TripPanel";
-import { playAlarm, prepareAlarm } from "@/lib/alarm";
+import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
 import { CATEGORIES, findPlaces, prettify, type Category } from "@/lib/overpass";
 import { loadPlan, savePlan } from "@/lib/plan";
@@ -38,6 +38,7 @@ import {
 import { formatDistance, getRoute, type RouteResult, type TravelMode } from "@/lib/routing";
 import { computeSchedule, secondsNow, toSeconds, type Schedule } from "@/lib/schedule";
 import type { Place } from "@/lib/types";
+import { fetchWeather, pickHour, type HourlyWeather } from "@/lib/weather";
 
 type NominatimResult = {
   place_id: number;
@@ -120,6 +121,9 @@ export default function TripMap() {
   const [legState, setLegState] = useState<LegState | null>(null);
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [delaySeconds, setDelaySeconds] = useState(0);
+  const [weather, setWeather] = useState<{ key: string; data: HourlyWeather[] } | null>(null);
 
   // Points and ranks
   const [progress, setProgress] = useState<Progress>(loadProgress);
@@ -132,6 +136,7 @@ export default function TripMap() {
   const watchId = useRef<number | null>(null);
   const fittedFor = useRef(-1);
   const rewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spoken = useRef<Set<string>>(new Set());
   const progressRef = useRef<Progress>(progress);
   const latest = useRef<TripRun>({
     stops: [],
@@ -227,9 +232,34 @@ export default function TripMap() {
           legSeconds: route ? route.legs.map((l) => l.duration) : [],
           startAt: toSeconds(startTime) ?? 0,
           arrivals,
+          delaySeconds,
         })
       : null;
   const canStart = schedule !== null;
+
+  // ---- Weather at each stop, at the time you arrive ----
+  const weatherKey = stops.map((s) => `${s.lat.toFixed(2)},${s.lon.toFixed(2)}`).join("|");
+  const currentWeather = weather && weather.key === weatherKey ? weather.data : null;
+
+  useEffect(() => {
+    if (!weatherKey) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const data = await fetchWeather(stops);
+      if (!cancelled && data) setWeather({ key: weatherKey, data });
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherKey]);
+
+  const stopWeather = stops.map((_, i) => {
+    const hours = currentWeather?.[i];
+    const arrive = schedule?.items[i]?.arriveAt;
+    return hours && arrive !== undefined ? pickHour(hours, arrive) : null;
+  });
 
   // Keep the latest values available for the GPS callback and the alarm
   useEffect(() => {
@@ -301,6 +331,25 @@ export default function TripMap() {
         : `In ${formatDistance(distanceMeters(position, nextStep))}: ${nextStep.text}`;
   }
 
+  // Speak the next turn: once when it comes up, and once when it is close
+  useEffect(() => {
+    if (!navigating || !voiceOn || !nextStep || !position) return;
+    const meters = distanceMeters(position, nextStep);
+    const base = `${navIndex}|${nextStep.lat.toFixed(5)},${nextStep.lon.toFixed(5)}`;
+    const arriving = nextStep.text === "You have arrived";
+
+    if (meters <= 30 && !spoken.current.has(`${base}|now`)) {
+      spoken.current.add(`${base}|now`);
+      spoken.current.add(`${base}|far`);
+      speak(arriving ? "Your stop is just ahead" : nextStep.text);
+    } else if (!spoken.current.has(`${base}|far`)) {
+      spoken.current.add(`${base}|far`);
+      const rounded = Math.max(10, Math.round(meters / 10) * 10);
+      const text = nextStep.text.charAt(0).toLowerCase() + nextStep.text.slice(1);
+      speak(arriving ? `Your stop is in ${rounded} meters` : `In ${rounded} meters, ${text}`);
+    }
+  }, [navigating, voiceOn, nextStep, position, navIndex]);
+
   // What the trip card shows about leaving and arriving
   const prevPoint = navIndex === 0 ? home : stops[navIndex - 1];
   const item = navigating ? schedule?.items[navIndex] : undefined;
@@ -360,6 +409,22 @@ export default function TripMap() {
     );
   }
 
+  function toggleVoice() {
+    const next = !voiceOn;
+    setVoiceOn(next);
+    setVoiceEnabled(next);
+  }
+
+  // Running late: move the rest of the plan later (or undo it with a negative number)
+  function addDelay(minutes: number) {
+    setDelaySeconds((d) => Math.max(0, d + minutes * 60));
+    // let the leave alarm sound again at the new time
+    const run = latest.current;
+    const stop = run.stops[run.index];
+    if (stop) run.alarmed.delete(stop.id);
+    setAlarm(null);
+  }
+
   // ---- Alarm ----
   function checkAlarm() {
     const run = latest.current;
@@ -407,6 +472,7 @@ export default function TripMap() {
     setGpsError("");
     setPosition(null);
     setArrivals({});
+    setDelaySeconds(0);
     setAlarm(null);
   }
 
@@ -426,6 +492,8 @@ export default function TripMap() {
 
       // Remember the real arrival time, so the rest of the plan follows it
       setArrivals((a) => ({ ...a, [reached.stop.id]: secondsNow() }));
+      setDelaySeconds(0);
+      speak(`You have arrived at ${reached.stop.name}`);
       setAlarm(null);
     } else {
       run.skipped += 1;
@@ -488,6 +556,7 @@ export default function TripMap() {
     run.skipped = 0;
     run.tripPoints = 0;
     run.alarmed.clear();
+    spoken.current.clear();
     fittedFor.current = -1;
     setNavIndex(0);
     setPosition(null);
@@ -497,6 +566,7 @@ export default function TripMap() {
     setReward(null);
     setAlarm(null);
     setArrivals({});
+    setDelaySeconds(0);
     setTripDone(false);
     setNavigating(true);
 
@@ -641,6 +711,7 @@ export default function TripMap() {
         canStart={canStart}
         progress={progress}
         visibleOnMobile={tab === "plan"}
+        weather={stopWeather}
         onRemove={removeFromTrip}
         onMove={moveStop}
         onUpdate={updateStop}
@@ -761,6 +832,10 @@ export default function TripMap() {
             lateBySeconds={item ? item.lateBySeconds : 0}
             accuracy={position?.accuracy ?? null}
             error={gpsError}
+            voiceOn={voiceOn}
+            onToggleVoice={toggleVoice}
+            delayMinutes={Math.round(delaySeconds / 60)}
+            onDelay={addDelay}
             onSkip={() => goToNextStop()}
             onStop={stopTrip}
           />

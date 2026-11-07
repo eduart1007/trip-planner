@@ -20,6 +20,7 @@ import {
 } from "@/lib/routing";
 import { DEFAULT_STAY_MINUTES, formatClock, type Schedule } from "@/lib/schedule";
 import type { Place } from "@/lib/types";
+import type { StopWeather } from "@/lib/weather";
 
 const WHERE: Record<TravelMode, string> = {
   foot: "on foot",
@@ -41,6 +42,7 @@ type Props = {
   currentIndex: number;
   canStart: boolean;
   visibleOnMobile: boolean;
+  weather: (StopWeather | null)[];
   progress: Progress;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -68,6 +70,7 @@ export default function TripPanel({
   currentIndex,
   canStart,
   visibleOnMobile,
+  weather,
   progress,
   onRemove,
   onMove,
@@ -92,6 +95,7 @@ export default function TripPanel({
     )})`;
   }
   const lateCount = schedule ? schedule.items.filter((it) => it.lateBySeconds > 0).length : 0;
+  const rainStops = weather.filter((w) => w && w.rainLikely).length;
 
   // Points you can earn: the first leg depends on where you start, so this is a minimum
   const chain = home ? [home, ...trip] : trip;
@@ -173,6 +177,11 @@ export default function TripPanel({
           {locked ? "Trip in progress 🔒" : "My trip"}
         </h1>
         <p className="text-sm text-gray-500">{summary}</p>
+        {rainStops > 0 && (
+          <p className="mt-1 text-sm font-medium text-blue-700">
+            ☔ Rain is likely at {rainStops} stop{rainStops === 1 ? "" : "s"}. Take an umbrella.
+          </p>
+        )}
         {lateCount > 0 && (
           <p className="mt-1 text-sm font-medium text-red-600">
             ⚠ You will be late at {lateCount} stop{lateCount === 1 ? "" : "s"}. Change the times or the order.
@@ -191,6 +200,7 @@ export default function TripPanel({
             const legIndex = home ? i : i - 1;
             const leg = legIndex >= 0 ? route?.legs[legIndex] : undefined;
             const item = schedule?.items[i];
+            const w = weather[i] ?? null;
             const legPoints = prev ? pointsForLeg(distanceMeters(prev, place), mode) : 0;
             const visited = locked && i < currentIndex;
             const current = locked && i === currentIndex;
@@ -244,6 +254,16 @@ export default function TripPanel({
                         {formatClock(item.departAt)}
                         {item.lateBySeconds > 0 &&
                           ` · ${Math.ceil(item.lateBySeconds / 60)} min late`}
+                      </p>
+                    )}
+
+                    {w && (
+                      <p
+                        className={`px-1 text-xs ${
+                          w.rainLikely ? "font-medium text-blue-700" : "text-gray-600"
+                        }`}
+                      >
+                        {w.icon} {Math.round(w.temp)}°C · {w.rainChance}% rain
                       </p>
                     )}
 

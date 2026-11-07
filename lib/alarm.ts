@@ -1,6 +1,31 @@
 let audio: AudioContext | null = null;
+let voiceEnabled = true;
 
-// Call this from a button click, so the browser allows sound and notifications later
+export function setVoiceEnabled(on: boolean) {
+  voiceEnabled = on;
+  if (!on) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+// Says a short message out loud (if voice is on)
+export function speak(text: string) {
+  if (!voiceEnabled) return;
+  try {
+    if (!("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    // voice is optional
+  }
+}
+
+// Call this from a button click, so the browser allows sound, voice and notifications later
 export function prepareAlarm() {
   try {
     if (!audio) {
@@ -12,6 +37,16 @@ export function prepareAlarm() {
     if (audio && audio.state === "suspended") void audio.resume();
   } catch {
     // sound is optional
+  }
+  try {
+    // A silent message unlocks voice on phones
+    if ("speechSynthesis" in window) {
+      const quiet = new SpeechSynthesisUtterance(" ");
+      quiet.volume = 0;
+      window.speechSynthesis.speak(quiet);
+    }
+  } catch {
+    // voice is optional
   }
   try {
     if ("Notification" in window && Notification.permission === "default") {
@@ -45,13 +80,7 @@ export function playAlarm(message: string) {
   } catch {
     // ignore
   }
-  try {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(message));
-    }
-  } catch {
-    // ignore
-  }
+  speak(message);
   try {
     if ("Notification" in window && Notification.permission === "granted") {
       new Notification("Time to leave", { body: message });

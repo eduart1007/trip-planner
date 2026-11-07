@@ -46,12 +46,21 @@ type Args = {
   legSeconds: number[]; // travel time of each part of the route
   startAt: number; // earliest time you can leave, in seconds since midnight
   arrivals: Record<string, number>; // real arrival times of stops you already reached
+  delaySeconds?: number; // running late: moves the rest of the plan later
 };
 
-export function computeSchedule({ stops, hasHome, legSeconds, startAt, arrivals }: Args): Schedule {
+export function computeSchedule({
+  stops,
+  hasHome,
+  legSeconds,
+  startAt,
+  arrivals,
+  delaySeconds = 0,
+}: Args): Schedule {
   const items: ScheduleItem[] = [];
   let clock = startAt; // the time you are free to leave the previous point
   let totalTravel = 0;
+  let delayApplied = false;
 
   stops.forEach((stop, i) => {
     const legIndex = hasHome ? i : i - 1;
@@ -61,6 +70,12 @@ export function computeSchedule({ stops, hasHome, legSeconds, startAt, arrivals 
     const arriveBy = toSeconds(stop.arriveBy);
     const stay = (stop.stayMinutes ?? DEFAULT_STAY_MINUTES) * 60;
     const actual = arrivals[stop.id];
+
+    // The delay applies once, to the first stop you have not reached yet
+    if (actual === undefined && !delayApplied) {
+      clock += delaySeconds;
+      delayApplied = true;
+    }
 
     let leaveAt: number | null = null;
     let arriveAt: number;

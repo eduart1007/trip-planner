@@ -40,12 +40,16 @@ type Props = {
   lateBySeconds: number;
   accuracy: number | null;
   error: string;
+  voiceOn: boolean;
+  onToggleVoice: () => void;
+  delayMinutes: number; // how much the plan was moved by "running late"
+  onDelay: (minutes: number) => void;
   onSkip: () => void;
   onStop: () => void;
 };
 
 const cardClass =
-  "absolute bottom-6 left-1/2 z-[1000] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl bg-white p-4 shadow-xl";
+  "absolute bottom-6 left-1/2 z-[1000] max-h-[75%] w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 overflow-y-auto rounded-xl bg-white p-4 shadow-xl";
 
 export default function NavigationCard({
   done,
@@ -62,6 +66,10 @@ export default function NavigationCard({
   lateBySeconds,
   accuracy,
   error,
+  voiceOn,
+  onToggleVoice,
+  delayMinutes,
+  onDelay,
   onSkip,
   onStop,
 }: Props) {
@@ -122,6 +130,35 @@ export default function NavigationCard({
           {accuracy !== null && accuracy > 100 && (
             <p className="mt-1 text-xs text-amber-700">
               GPS signal is weak (accurate to about {Math.round(accuracy)} m).
+            </p>
+          )}
+
+          {/* Running late and voice */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <span>Running late?</span>
+            {[10, 20, 30].map((m) => (
+              <button
+                key={m}
+                onClick={() => onDelay(m)}
+                className="rounded-full border border-gray-300 px-2.5 py-1 hover:bg-gray-50"
+              >
+                +{m} min
+              </button>
+            ))}
+            <button
+              onClick={onToggleVoice}
+              aria-label={voiceOn ? "Turn voice off" : "Turn voice on"}
+              className="ml-auto text-lg leading-none"
+            >
+              {voiceOn ? "🔊" : "🔇"}
+            </button>
+          </div>
+          {delayMinutes > 0 && (
+            <p className="mt-1 text-xs text-amber-700">
+              Plan moved later by {delayMinutes} min.{" "}
+              <button onClick={() => onDelay(-delayMinutes)} className="underline">
+                Undo
+              </button>
             </p>
           )}
 
