@@ -133,6 +133,7 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [myLocation, setMyLocation] = useState<UserPosition | null>(null);
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = loadSettings();
     setCurrentSettings(saved);
@@ -155,6 +156,7 @@ export default function TripMap() {
   const fittedFor = useRef(-1);
   const rewardTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spoken = useRef<Set<string>>(new Set());
+  const skipFit = useRef(initial.trip.length + (initial.home ? 1 : 0) >= 2);
   const progressRef = useRef<Progress>(progress);
   const latest = useRef<TripRun>({
     stops: [],
@@ -199,6 +201,12 @@ export default function TripMap() {
     map?.invalidateSize();
   }, [settings, map]);
 
+  // Open the map on your current location
+  useEffect(() => {
+    if (map) locateMe(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
   // Save the plan and the points in this browser
   useEffect(() => {
     savePlan({ home, trip, startTime, mode });
@@ -241,8 +249,13 @@ export default function TripMap() {
   }, [wantedKey]);
 
   // Zoom the map so the whole route is visible
+  // (not for the plan saved from last time, so the map can open on your location)
   useEffect(() => {
     if (map && route && route.path.length > 1) {
+      if (skipFit.current) {
+        skipFit.current = false;
+        return;
+      }
       map.fitBounds(route.path, { padding: [60, 60] });
     }
   }, [map, route]);
@@ -443,6 +456,32 @@ export default function TripMap() {
     setCurrentSettings(next); // so distances and times use it right away
     saveSettings(next);
     setSettings(next);
+  }
+
+  // Move the map to where you are
+  function locateMe(announce: boolean) {
+    if (!navigator.geolocation) {
+      if (announce) setMessage("Your browser does not support GPS.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const here = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        };
+        setMyLocation(here);
+        map?.setView([here.lat, here.lon], 15);
+      },
+      () => {
+        if (announce) {
+          setMessage("Could not get your location. Allow location access and try again.");
+        }
+      },
+      // The first look-up on opening is quick and cheap; the button asks for a precise one
+      { enableHighAccuracy: announce, timeout: 15000, maximumAge: announce ? 0 : 300000 }
+    );
   }
 
   function toggleVoice() {
@@ -780,6 +819,14 @@ export default function TripMap() {
             >
               {loading ? "..." : "Search"}
             </button>
+            <button
+              type="button"
+              onClick={() => locateMe(true)}
+              aria-label="Go to my location"
+              className="rounded-lg bg-white px-3 py-2 text-base shadow-md hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800"
+            >
+              📍
+            </button>
           </form>
 
           <div className="mt-2 flex flex-nowrap items-center gap-2 overflow-x-auto py-1 md:flex-wrap md:overflow-visible">
@@ -879,7 +926,13 @@ export default function TripMap() {
         )}
 
         <MapContainer
-          center={[48.8566, 2.3522]}
+          center={
+            initial.home
+              ? [initial.home.lat, initial.home.lon]
+              : initial.trip[0]
+                ? [initial.trip[0].lat, initial.trip[0].lon]
+                : [48.8566, 2.3522]
+          }
           zoom={13}
           style={{ position: "absolute", inset: 0 }}
           zoomControl={false}
@@ -944,6 +997,21 @@ export default function TripMap() {
                 }}
               />
             </>
+          )}
+
+          {/* Where you are (when no trip is running) */}
+          {!navigating && myLocation && (
+            <CircleMarker
+              center={[myLocation.lat, myLocation.lon]}
+              radius={8}
+              pathOptions={{
+                color: "white",
+                weight: 3,
+                fillColor: "#2563eb",
+                fillOpacity: 1,
+                interactive: false,
+              }}
+            />
           )}
 
           {/* Start point */}
