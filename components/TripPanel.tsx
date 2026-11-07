@@ -2,8 +2,9 @@
 
 import { t } from "@/lib/i18n";
 
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import RankCard from "@/components/RankCard";
+import { formatMoney } from "@/lib/settings";
 import { checkOpen } from "@/lib/hours";
 import TimeSelect from "@/components/TimeSelect";
 import { distanceMeters } from "@/lib/geo";
@@ -48,6 +49,8 @@ type Props = {
   shareNote: string;
   onShare: () => void;
   onClear: () => void;
+  onCalendar: () => void;
+  onPrint: () => void;
   orderNote: string;
   canUndoOrder: boolean;
   onOptimize: () => void;
@@ -87,6 +90,8 @@ export default function TripPanel({
   shareNote,
   onShare,
   onClear,
+  onCalendar,
+  onPrint,
   orderNote,
   canUndoOrder,
   onOptimize,
@@ -106,6 +111,17 @@ export default function TripPanel({
   onStart,
   onStop,
 }: Props) {
+  const [detailsOpen, setDetailsOpen] = useState<Set<string>>(new Set());
+  const toggleDetails = (id: string) =>
+    setDetailsOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const totalCost = trip.reduce((sum, p) => sum + (p.cost ?? 0), 0);
+  const canExport = schedule !== null && trip.length > 0;
+
   const modeIcon = MODES.find((m) => m.id === mode)?.icon ?? "";
 
   // Whole-trip summary
@@ -203,6 +219,11 @@ export default function TripPanel({
           {locked ? t("tripInProgress") : t("myTrip")}
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">{summary}</p>
+        {totalCost > 0 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            💰 {t("budgetTotal", { n: formatMoney(totalCost) })}
+          </p>
+        )}
         {rainStops > 0 && (
           <p className="mt-1 text-sm font-medium text-blue-700 dark:text-blue-300">
             ☔ {t(rainStops === 1 ? "rain1" : "rainN", { n: rainStops })}
@@ -227,6 +248,9 @@ export default function TripPanel({
             const leg = legIndex >= 0 ? route?.legs[legIndex] : undefined;
             const item = schedule?.items[i];
             const w = weather[i] ?? null;
+            const checklist = place.checklist ?? [];
+            const doneCount = checklist.filter((c) => c.done).length;
+            const showDetails = detailsOpen.has(place.id);
             const open = item
               ? checkOpen(place.openingHours, item.arriveAt, place.stayMinutes ?? DEFAULT_STAY_MINUTES)
               : "unknown";
@@ -310,6 +334,94 @@ export default function TripPanel({
                       >
                         {w.icon} {Math.round(w.temp)}°C · {t("rainChance", { n: w.rainChance })}
                       </p>
+                    )}
+
+                    <button
+                      onClick={() => toggleDetails(place.id)}
+                      className="mt-2 px-1 text-left text-xs font-medium text-blue-700 hover:underline dark:text-blue-300"
+                    >
+                      {showDetails ? "▾" : "▸"} 📝 {t("details")}
+                      {checklist.length > 0 && ` · ✓ ${doneCount}/${checklist.length}`}
+                      {place.cost ? ` · ${formatMoney(place.cost)}` : ""}
+                    </button>
+                    {showDetails && (
+                      <div className="mt-2 space-y-2 px-1">
+                        <textarea
+                          value={place.note ?? ""}
+                          onChange={(e) => onUpdate(place.id, { note: e.target.value })}
+                          placeholder={t("notePlaceholder")}
+                          rows={2}
+                          className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                        />
+                        <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          {t("budget")}
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            inputMode="decimal"
+                            value={place.cost ?? ""}
+                            onChange={(e) => {
+                              const n = parseFloat(e.target.value);
+                              onUpdate(place.id, { cost: Number.isNaN(n) || n < 0 ? undefined : n });
+                            }}
+                            className="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                          />
+                        </label>
+                        <ul className="space-y-1">
+                          {checklist.map((item) => (
+                            <li key={item.id} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={item.done}
+                                onChange={() =>
+                                  onUpdate(place.id, {
+                                    checklist: checklist.map((c) =>
+                                      c.id === item.id ? { ...c, done: !c.done } : c
+                                    ),
+                                  })
+                                }
+                              />
+                              <span
+                                className={`min-w-0 flex-1 break-words ${
+                                  item.done
+                                    ? "text-gray-400 line-through dark:text-gray-500"
+                                    : "text-gray-800 dark:text-gray-200"
+                                }`}
+                              >
+                                {item.text}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  onUpdate(place.id, {
+                                    checklist: checklist.filter((c) => c.id !== item.id),
+                                  })
+                                }
+                                aria-label={t("remove")}
+                                className="text-gray-400 hover:text-red-600 dark:text-gray-500"
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <input
+                          placeholder={t("addItem")}
+                          onKeyDown={(e) => {
+                            const value = e.currentTarget.value.trim();
+                            if (e.key === "Enter" && value) {
+                              onUpdate(place.id, {
+                                checklist: [
+                                  ...checklist,
+                                  { id: `${Date.now()}`, text: value, done: false },
+                                ],
+                              });
+                              e.currentTarget.value = "";
+                            }
+                          }}
+                          className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                        />
+                      </div>
                     )}
 
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 px-1 text-xs text-gray-500 dark:text-gray-400">
@@ -406,7 +518,7 @@ export default function TripPanel({
         </div>
       )}
 
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+      <div className="max-h-[55vh] overflow-y-auto border-t border-gray-200 dark:border-gray-700 p-4">
         <div className="flex gap-2">
           {MODES.map((m) => (
             <button
@@ -480,6 +592,23 @@ export default function TripPanel({
             className="flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
           >
             🗑 {t("clearRoute")}
+          </button>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={onCalendar}
+            disabled={!canExport}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            📅 {t("calendar")}
+          </button>
+          <button
+            onClick={onPrint}
+            disabled={!canExport}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            🖨 {t("print")}
           </button>
         </div>
 

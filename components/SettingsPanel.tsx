@@ -104,6 +104,17 @@ export default function SettingsPanel({
         />
 
         <Choice
+          label={t("currency")}
+          value={settings.currency}
+          options={[
+            { value: "EUR", label: "€ EUR" },
+            { value: "USD", label: "$ USD" },
+            { value: "GBP", label: "£ GBP" },
+          ]}
+          onChange={(currency) => onChange({ currency })}
+        />
+
+        <Choice
           label={t("theme")}
           value={settings.theme}
           options={[

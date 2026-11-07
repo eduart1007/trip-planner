@@ -232,4 +232,16 @@ export const TRANSLATIONS = {
   closesDuringStay: { en: "Closes before you leave", es: "Cierra antes de que te vayas", fr: "Ferme avant votre départ", de: "Schließt, bevor du gehst", pt: "Fecha antes de você sair" },
   suggestions: { en: "Suggestions near you", es: "Sugerencias cerca de ti", fr: "Suggestions près de vous", de: "Vorschläge in deiner Nähe", pt: "Sugestões perto de você" },
   add: { en: "Add", es: "Añadir", fr: "Ajouter", de: "Hinzufügen", pt: "Adicionar" },
+
+  // ---- Trip extras ----
+  currency: { en: "Currency", es: "Moneda", fr: "Devise", de: "Währung", pt: "Moeda" },
+  details: { en: "Notes & budget", es: "Notas y presupuesto", fr: "Notes et budget", de: "Notizen & Budget", pt: "Notas e orçamento" },
+  notePlaceholder: { en: "Add a note, e.g. book tickets", es: "Añade una nota, p. ej. reservar entradas", fr: "Ajoutez une note, p. ex. réserver les billets", de: "Notiz hinzufügen, z. B. Tickets buchen", pt: "Adicione uma nota, ex.: reservar ingressos" },
+  budget: { en: "Budget", es: "Presupuesto", fr: "Budget", de: "Budget", pt: "Orçamento" },
+  addItem: { en: "Add an item and press Enter", es: "Añade un elemento y pulsa Intro", fr: "Ajoutez un élément et appuyez sur Entrée", de: "Eintrag hinzufügen und Enter drücken", pt: "Adicione um item e pressione Enter" },
+  budgetTotal: { en: "Budget: {n}", es: "Presupuesto: {n}", fr: "Budget : {n}", de: "Budget: {n}", pt: "Orçamento: {n}" },
+  calendar: { en: "Calendar", es: "Calendario", fr: "Calendrier", de: "Kalender", pt: "Calendário" },
+  print: { en: "Print", es: "Imprimir", fr: "Imprimer", de: "Drucken", pt: "Imprimir" },
+  total: { en: "Total", es: "Total", fr: "Total", de: "Gesamt", pt: "Total" },
+  popupBlocked: { en: "Allow pop-ups to print your plan.", es: "Permite las ventanas emergentes para imprimir tu plan.", fr: "Autorisez les fenêtres pop-up pour imprimer votre plan.", de: "Erlaube Pop-ups, um deinen Plan zu drucken.", pt: "Permita pop-ups para imprimir seu plano." },
 } satisfies Record<string, Entry>;

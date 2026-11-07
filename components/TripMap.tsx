@@ -29,6 +29,7 @@ import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
+import { buildIcs, downloadFile, printTrip } from "@/lib/export";
 import { optimizeOrder } from "@/lib/optimize";
 import { buildShareUrl, consumeSharedPlan } from "@/lib/share";
 import { guideSeen, markGuideSeen } from "@/lib/guide";
@@ -598,6 +599,26 @@ export default function TripMap() {
     setOrderUndo(null);
   }
 
+  // Save the plan as a calendar file that opens in Google, Apple or Outlook calendar
+  function exportCalendar() {
+    if (!schedule || stops.length === 0) return;
+    downloadFile("trip-plan.ics", buildIcs(stops, schedule), "text/calendar");
+  }
+
+  // Open a clean page of the plan to print, or to save as a PDF
+  function printPlan() {
+    if (!schedule || stops.length === 0) return;
+    const opened = printTrip(stops, schedule, {
+      title: t("shareTitle"),
+      arrive: t("arrive"),
+      leave: t("leave"),
+      stay: t("stay"),
+      budget: t("budget"),
+      total: t("total"),
+    });
+    if (!opened) window.alert(t("popupBlocked"));
+  }
+
   function toggleVoice() {
     const next = !voiceOn;
     setVoiceOn(next);
@@ -902,6 +923,8 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        onCalendar={exportCalendar}
+        onPrint={printPlan}
         orderNote={orderNote}
         canUndoOrder={orderUndo !== null && stops.map((p) => p.id).join("|") === orderUndo.after}
         onOptimize={optimizeStops}

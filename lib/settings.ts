@@ -3,6 +3,7 @@ import { detectLanguage, setLanguage, t, type Language } from "./i18n";
 export type Settings = {
   language: Language;
   units: "km" | "mi";
+  currency: "EUR" | "USD" | "GBP";
   clock: "24h" | "12h";
   theme: "light" | "dark" | "auto";
   textSize: "normal" | "large" | "xlarge";
@@ -11,6 +12,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   units: "km",
+  currency: "EUR",
   clock: "24h",
   theme: "light",
   textSize: "normal",
@@ -90,4 +92,17 @@ export function pointsUnit() {
 
 export function pointsPerUnit(perKm: number) {
   return current.units === "mi" ? Math.round(perKm * 1.609344) : perKm;
+}
+
+// An amount of money in the chosen currency
+export function formatMoney(amount: number) {
+  try {
+    return new Intl.NumberFormat(current.language, {
+      style: "currency",
+      currency: current.currency,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${current.currency}`;
+  }
 }
