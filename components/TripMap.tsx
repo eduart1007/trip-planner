@@ -29,9 +29,16 @@ import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
 import { playAlarm, prepareAlarm, setVoiceEnabled, speak } from "@/lib/alarm";
 import { distanceMeters } from "@/lib/geo";
+import { optimizeOrder } from "@/lib/optimize";
 import { buildShareUrl, consumeSharedPlan } from "@/lib/share";
 import { guideSeen, markGuideSeen } from "@/lib/guide";
-import { CATEGORIES, findPlaces, prettify, type Category } from "@/lib/overpass";
+import {
+  CATEGORIES,
+  findPlaces,
+  findSuggestions,
+  prettify,
+  type Category,
+} from "@/lib/overpass";
 import { loadPlan, savePlan } from "@/lib/plan";
 import {
   TRIP_BONUS,
@@ -61,6 +68,7 @@ type NominatimResult = {
   display_name: string;
   lat: string;
   lon: string;
+  extratags?: { opening_hours?: string };
 };
 
 type RouteState = { key: string; data: RouteResult | null; failed: boolean };
@@ -143,6 +151,9 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [orderUndo, setOrderUndo] = useState<{ before: Place[]; after: string } | null>(null);
+  const [orderNote, setOrderNote] = useState("");
+  const [suggestions, setSuggestions] = useState<Place[]>([]);
   const [shareNote, setShareNote] = useState("");
   const [myLocation, setMyLocation] = useState<UserPosition | null>(null);
   const [settings, setSettings] = useState<Settings>(() => {
@@ -224,6 +235,28 @@ export default function TripMap() {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
   }, []);
+
+  // Popular places near you (or near your start point)
+  const suggestionCenter = myLocation ?? home;
+  const suggestionKey = suggestionCenter
+    ? `${suggestionCenter.lat.toFixed(2)},${suggestionCenter.lon.toFixed(2)}`
+    : "";
+
+  useEffect(() => {
+    if (!suggestionCenter) return;
+    let cancelled = false;
+    findSuggestions(suggestionCenter)
+      .then((places) => {
+        if (!cancelled) setSuggestions(places);
+      })
+      .catch(() => {
+        // suggestions are optional
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestionKey]);
 
   // Save the plan and the points in this browser
   useEffect(() => {
@@ -541,6 +574,30 @@ export default function TripMap() {
     setDropped(null);
   }
 
+  function flashOrderNote(text: string) {
+    setOrderNote(text);
+    setTimeout(() => setOrderNote(""), 3000);
+  }
+
+  // Put the stops in the shortest order
+  function optimizeStops() {
+    if (navigating || stops.length < 2) return;
+    const { order, savedMeters } = optimizeOrder(stops, home);
+    if (savedMeters < 100) {
+      flashOrderNote(t("alreadyShortest"));
+      return;
+    }
+    setOrderUndo({ before: stops, after: order.map((p) => p.id).join("|") });
+    setTrip(order);
+    flashOrderNote(t("orderSaved", { d: formatDistance(savedMeters) }));
+  }
+
+  function undoOrder() {
+    if (!orderUndo) return;
+    setTrip(orderUndo.before);
+    setOrderUndo(null);
+  }
+
   function toggleVoice() {
     const next = !voiceOn;
     setVoiceOn(next);
@@ -771,7 +828,7 @@ export default function TripMap() {
     setActiveCategory(null);
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&extratags=1&limit=5&q=${encodeURIComponent(query)}`
       );
       const data: NominatimResult[] = await res.json();
 
@@ -782,6 +839,7 @@ export default function TripMap() {
         address: r.display_name,
         lat: parseFloat(r.lat),
         lon: parseFloat(r.lon),
+        openingHours: r.extratags?.opening_hours,
       }));
 
       setResults(places);
@@ -844,6 +902,16 @@ export default function TripMap() {
         progress={progress}
         visibleOnMobile={tab === "plan"}
         weather={stopWeather}
+        orderNote={orderNote}
+        canUndoOrder={orderUndo !== null && stops.map((p) => p.id).join("|") === orderUndo.after}
+        onOptimize={optimizeStops}
+        onUndoOrder={undoOrder}
+        suggestions={suggestions.filter((p) => !tripIds.has(p.id)).slice(0, 6)}
+        onShowSuggestion={(p) => {
+          setTab("map");
+          map?.flyTo([p.lat, p.lon], 16);
+        }}
+        onAddSuggestion={addToTrip}
         shareNote={shareNote}
         onShare={shareTrip}
         onClear={clearRoute}

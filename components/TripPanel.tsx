@@ -4,6 +4,7 @@ import { t } from "@/lib/i18n";
 
 import { Fragment } from "react";
 import RankCard from "@/components/RankCard";
+import { checkOpen } from "@/lib/hours";
 import TimeSelect from "@/components/TimeSelect";
 import { distanceMeters } from "@/lib/geo";
 import {
@@ -47,6 +48,13 @@ type Props = {
   shareNote: string;
   onShare: () => void;
   onClear: () => void;
+  orderNote: string;
+  canUndoOrder: boolean;
+  onOptimize: () => void;
+  onUndoOrder: () => void;
+  suggestions: Place[];
+  onShowSuggestion: (place: Place) => void;
+  onAddSuggestion: (place: Place) => void;
   progress: Progress;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -79,6 +87,13 @@ export default function TripPanel({
   shareNote,
   onShare,
   onClear,
+  orderNote,
+  canUndoOrder,
+  onOptimize,
+  onUndoOrder,
+  suggestions,
+  onShowSuggestion,
+  onAddSuggestion,
   progress,
   onRemove,
   onMove,
@@ -212,6 +227,9 @@ export default function TripPanel({
             const leg = legIndex >= 0 ? route?.legs[legIndex] : undefined;
             const item = schedule?.items[i];
             const w = weather[i] ?? null;
+            const open = item
+              ? checkOpen(place.openingHours, item.arriveAt, place.stayMinutes ?? DEFAULT_STAY_MINUTES)
+              : "unknown";
             const legPoints = prev ? pointsForLeg(distanceMeters(prev, place), mode) : 0;
             const visited = locked && i < currentIndex;
             const current = locked && i === currentIndex;
@@ -268,6 +286,22 @@ export default function TripPanel({
                       </p>
                     )}
 
+                    {open === "closed" && (
+                      <p
+                        title={place.openingHours}
+                        className="px-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                      >
+                        🕒 {t("closedAtArrival")}
+                      </p>
+                    )}
+                    {open === "closesBeforeEnd" && (
+                      <p
+                        title={place.openingHours}
+                        className="px-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+                      >
+                        🕒 {t("closesDuringStay")}
+                      </p>
+                    )}
                     {w && (
                       <p
                         className={`px-1 text-xs ${
@@ -343,6 +377,35 @@ export default function TripPanel({
         </ol>
       )}
 
+      {suggestions.length > 0 && (
+        <div className="shrink-0 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+          <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
+            ✨ {t("suggestions")}
+          </p>
+          <ul className="max-h-44 space-y-2 overflow-y-auto">
+            {suggestions.map((p) => (
+              <li key={p.id} className="flex items-center gap-2">
+                <button onClick={() => onShowSuggestion(p)} className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
+                    {p.name}
+                  </span>
+                  <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                    {p.category}
+                  </span>
+                </button>
+                <button
+                  onClick={() => onAddSuggestion(p)}
+                  aria-label={`${t("addToTrip")}: ${p.name}`}
+                  className="rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                >
+                  + {t("add")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="border-t border-gray-200 dark:border-gray-700 p-4">
         <div className="flex gap-2">
           {MODES.map((m) => (
@@ -384,6 +447,24 @@ export default function TripPanel({
             🏆 {t(WORTH_KEYS[mode], { n: tripPoints })}
           </p>
         )}
+
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={onOptimize}
+            disabled={locked || trip.length < 2}
+            className="flex-1 rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950"
+          >
+            {orderNote || `✨ ${t("optimize")}`}
+          </button>
+          {canUndoOrder && !locked && (
+            <button
+              onClick={onUndoOrder}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              ↩ {t("undo")}
+            </button>
+          )}
+        </div>
 
         <div className="mt-3 flex gap-2">
           <button

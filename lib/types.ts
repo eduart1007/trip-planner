@@ -7,4 +7,5 @@ export type Place = {
   address?: string;
   stayMinutes?: number; // how long you stay at this stop (default 30)
   arriveBy?: string; // "HH:MM": the time you want to be here (optional)
+  openingHours?: string; // from OpenStreetMap, e.g. "Mo-Fr 09:00-18:00"
 };

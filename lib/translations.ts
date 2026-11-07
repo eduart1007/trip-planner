@@ -218,4 +218,18 @@ export const TRANSLATIONS = {
   clearConfirm: { en: "Remove all stops from this trip? Your start point stays.", es: "¿Quitar todas las paradas de este viaje? Tu punto de partida se mantiene.", fr: "Retirer toutes les étapes de ce voyage ? Votre point de départ est conservé.", de: "Alle Stopps dieser Reise entfernen? Dein Startpunkt bleibt erhalten.", pt: "Remover todas as paradas desta viagem? Seu ponto de partida será mantido." },
   sharedLoad: { en: "Open the shared trip? It will replace the stops in your current plan.", es: "¿Abrir el viaje compartido? Reemplazará las paradas de tu plan actual.", fr: "Ouvrir le voyage partagé ? Il remplacera les étapes de votre plan actuel.", de: "Die geteilte Reise öffnen? Sie ersetzt die Stopps in deinem aktuellen Plan.", pt: "Abrir a viagem compartilhada? Ela substituirá as paradas do seu plano atual." },
   equiv: { en: "≈ {car} by car · {bike} by bike · {foot} on foot", es: "≈ {car} en coche · {bike} en bici · {foot} a pie", fr: "≈ {car} en voiture · {bike} à vélo · {foot} à pied", de: "≈ {car} mit dem Auto · {bike} mit dem Rad · {foot} zu Fuß", pt: "≈ {car} de carro · {bike} de bicicleta · {foot} a pé" },
+
+  // ---- Smart planning ----
+  cat_toilets: { en: "🚻 Toilets", es: "🚻 Aseos", fr: "🚻 Toilettes", de: "🚻 Toiletten", pt: "🚻 Banheiros" },
+  cat_pharmacy: { en: "💊 Pharmacy", es: "💊 Farmacia", fr: "💊 Pharmacie", de: "💊 Apotheke", pt: "💊 Farmácia" },
+  cat_atm: { en: "🏧 ATM", es: "🏧 Cajero", fr: "🏧 Distributeur", de: "🏧 Geldautomat", pt: "🏧 Caixa eletrônico" },
+  cat_water: { en: "🚰 Drinking water", es: "🚰 Agua potable", fr: "🚰 Eau potable", de: "🚰 Trinkwasser", pt: "🚰 Água potável" },
+  cat_hospital: { en: "🏥 Hospital", es: "🏥 Hospital", fr: "🏥 Hôpital", de: "🏥 Krankenhaus", pt: "🏥 Hospital" },
+  optimize: { en: "Optimize order", es: "Optimizar orden", fr: "Optimiser l’ordre", de: "Reihenfolge optimieren", pt: "Otimizar ordem" },
+  orderSaved: { en: "Shorter by about {d}", es: "Unos {d} menos", fr: "Environ {d} de moins", de: "Etwa {d} kürzer", pt: "Cerca de {d} a menos" },
+  alreadyShortest: { en: "Already the shortest order", es: "Ya es el orden más corto", fr: "C’est déjà l’ordre le plus court", de: "Schon die kürzeste Reihenfolge", pt: "Já é a ordem mais curta" },
+  closedAtArrival: { en: "Probably closed when you arrive", es: "Probablemente cerrado cuando llegues", fr: "Probablement fermé à votre arrivée", de: "Vermutlich geschlossen bei deiner Ankunft", pt: "Provavelmente fechado quando você chegar" },
+  closesDuringStay: { en: "Closes before you leave", es: "Cierra antes de que te vayas", fr: "Ferme avant votre départ", de: "Schließt, bevor du gehst", pt: "Fecha antes de você sair" },
+  suggestions: { en: "Suggestions near you", es: "Sugerencias cerca de ti", fr: "Suggestions près de vous", de: "Vorschläge in deiner Nähe", pt: "Sugestões perto de você" },
+  add: { en: "Add", es: "Añadir", fr: "Ajouter", de: "Hinzufügen", pt: "Adicionar" },
 } satisfies Record<string, Entry>;
