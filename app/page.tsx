@@ -2,8 +2,15 @@
 
 import dynamic from "next/dynamic";
 
-// Leaflet needs the browser, so we load it without server rendering
-const TripMap = dynamic(() => import("@/components/TripMap"), { ssr: false });
+// The map needs the browser, so it is loaded without server rendering
+const TripMap = dynamic(() => import("@/components/TripMap"), {
+  ssr: false,
+  loading: () => (
+    <div role="status" className="flex h-full items-center justify-center text-sm text-gray-500">
+      Loading map…
+    </div>
+  ),
+});
 
 export default function Home() {
   return (

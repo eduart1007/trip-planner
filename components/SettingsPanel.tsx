@@ -1,5 +1,6 @@
 "use client";
 
+import InstallButton from "@/components/InstallButton";
 import { LANGUAGES, t, type Language } from "@/lib/i18n";
 import type { Settings } from "@/lib/settings";
 
@@ -135,6 +136,8 @@ export default function SettingsPanel({
           ]}
           onChange={(textSize) => onChange({ textSize })}
         />
+
+        <InstallButton />
 
         {onOpenGuide && (
           <button

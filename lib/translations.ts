@@ -293,4 +293,10 @@ export const TRANSLATIONS = {
   badgeTrips: { en: "{n} trips finished", es: "{n} viajes completados", fr: "{n} voyages terminés", de: "{n} Reisen abgeschlossen", pt: "{n} viagens concluídas" },
   badgeWalk: { en: "{n} km walked", es: "{n} km a pie", fr: "{n} km à pied", de: "{n} km zu Fuß", pt: "{n} km a pé" },
   badgeLevel: { en: "Reached level {n}", es: "Nivel {n} alcanzado", fr: "Niveau {n} atteint", de: "Level {n} erreicht", pt: "Nível {n} alcançado" },
+
+  // ---- Installable app ----
+  installApp: { en: "Install app", es: "Instalar la app", fr: "Installer l’appli", de: "App installieren", pt: "Instalar o app" },
+  installed: { en: "App installed", es: "App instalada", fr: "Appli installée", de: "App installiert", pt: "App instalado" },
+  installIos: { en: "On iPhone: tap Share, then Add to Home Screen.", es: "En iPhone: pulsa Compartir y luego Añadir a pantalla de inicio.", fr: "Sur iPhone : touchez Partager, puis Sur l’écran d’accueil.", de: "Auf dem iPhone: Teilen tippen, dann „Zum Home-Bildschirm“.", pt: "No iPhone: toque em Compartilhar e depois em Adicionar à Tela de Início." },
+  offlineBanner: { en: "You are offline. Maps, routes and weather need a connection.", es: "Estás sin conexión. Los mapas, las rutas y el tiempo necesitan conexión.", fr: "Vous êtes hors ligne. Les cartes, itinéraires et la météo nécessitent une connexion.", de: "Du bist offline. Karten, Routen und Wetter brauchen eine Verbindung.", pt: "Você está offline. Mapas, rotas e clima precisam de conexão." },
 } satisfies Record<string, Entry>;
