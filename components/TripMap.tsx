@@ -26,6 +26,7 @@ import {
 import AccountPanel from "@/components/AccountPanel";
 import StatsPanel from "@/components/StatsPanel";
 import NavigationCard from "@/components/NavigationCard";
+import TripSummary from "@/components/TripSummary";
 import SettingsPanel from "@/components/SettingsPanel";
 import WelcomeGuide from "@/components/WelcomeGuide";
 import TripPanel from "@/components/TripPanel";
@@ -34,6 +35,7 @@ import { useUser } from "@/lib/auth";
 import { earnedBadges, badgeLabel } from "@/lib/badges";
 import { loadProfile, mergeProgress, saveProfile } from "@/lib/cloud";
 import { distanceMeters } from "@/lib/geo";
+import type { TripSummaryData } from "@/lib/summary";
 import { searchPlaces } from "@/lib/search";
 import { buildIcs, downloadFile, printTrip } from "@/lib/export";
 import { optimizeOrder } from "@/lib/optimize";
@@ -98,6 +100,12 @@ type TripRun = {
   skipped: number;
   tripPoints: number;
   alarmed: Set<string>;
+  startedAt: number; // when the trip started (milliseconds)
+  tripMeters: number; // distance of the legs you reached
+  arrivalLog: Record<string, number>; // real arrival time of each stop you reached
+  planned: number[]; // the planned arrival times when you pressed Start
+  badgesAtStart: string[];
+  levelAtStart: number;
 };
 
 // How close (in metres) you must be to a stop for it to count as reached
@@ -161,6 +169,7 @@ export default function TripMap() {
   const [arrivals, setArrivals] = useState<Record<string, number>>({});
   const [alarm, setAlarm] = useState<string | null>(null);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [summary, setSummary] = useState<TripSummaryData | null>(null);
   const [showAccount, setShowAccount] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [cloudUser, setCloudUser] = useState<string | null>(null);
@@ -204,6 +213,12 @@ export default function TripMap() {
     skipped: 0,
     tripPoints: 0,
     alarmed: new Set(),
+    startedAt: 0,
+    tripMeters: 0,
+    arrivalLog: {},
+    planned: [],
+    badgesAtStart: [],
+    levelAtStart: 1,
   });
 
   // Open the popup of a freshly dropped pin
@@ -752,6 +767,23 @@ export default function TripMap() {
     stopWatching();
     setNavigating(false);
     setTripDone(true);
+
+    // Collect what happened during the trip for the summary window
+    const run = latest.current;
+    const startBadges = new Set(run.badgesAtStart);
+    setSummary({
+      stops: run.stops.map((stop, i) => ({
+        name: stop.name,
+        arrivedAt: run.arrivalLog[stop.id],
+        plannedAt: run.planned[i],
+      })),
+      meters: run.tripMeters,
+      elapsedSeconds: Math.max(0, Math.round((Date.now() - run.startedAt) / 1000)),
+      points: run.tripPoints,
+      mode: run.mode,
+      newBadges: earnedBadges(progressRef.current).filter((b) => !startBadges.has(b.id)),
+      levelAtStart: run.levelAtStart,
+    });
   }
 
   function stopTrip() {
@@ -762,6 +794,7 @@ export default function TripMap() {
     setPosition(null);
     setArrivals({});
     setDelaySeconds(0);
+    setSummary(null);
     setAlarm(null);
   }
 
@@ -777,6 +810,8 @@ export default function TripMap() {
       const legMeters = run.legStart ? distanceMeters(run.legStart, reached.stop) : 0;
       earned = pointsForLeg(legMeters, run.mode);
       if (earned > 0 && run.mode === "foot") walked = legMeters;
+      run.tripMeters += legMeters;
+      run.arrivalLog[reached.stop.id] = secondsNow();
       run.legStart = reached.here;
 
       // Remember the real arrival time, so the rest of the plan follows it
@@ -846,6 +881,12 @@ export default function TripMap() {
     run.skipped = 0;
     run.tripPoints = 0;
     run.alarmed.clear();
+    run.startedAt = Date.now();
+    run.tripMeters = 0;
+    run.arrivalLog = {};
+    run.planned = schedule ? schedule.items.map((it) => it.arriveAt) : [];
+    run.badgesAtStart = earnedBadges(progressRef.current).map((b) => b.id);
+    run.levelAtStart = getLevel(progressRef.current.points).level;
     spoken.current.clear();
     fittedFor.current = -1;
     setNavIndex(0);
@@ -857,6 +898,7 @@ export default function TripMap() {
     setAlarm(null);
     setArrivals({});
     setDelaySeconds(0);
+    setSummary(null);
     setTripDone(false);
     setNavigating(true);
 
@@ -1137,7 +1179,7 @@ export default function TripMap() {
         )}
 
         {/* Live trip card at the bottom */}
-        {(navigating || tripDone) && (
+        {navigating && (
           <NavigationCard
             done={tripDone}
             earned={tripPoints}
@@ -1340,6 +1382,10 @@ export default function TripMap() {
 
       {showStats && (
         <StatsPanel progress={progress} signedIn={user !== null} onClose={() => setShowStats(false)} />
+      )}
+
+      {tripDone && summary && (
+        <TripSummary summary={summary} progress={progress} onClose={stopTrip} />
       )}
 
       {showAccount && (

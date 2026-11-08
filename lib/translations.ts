@@ -299,4 +299,15 @@ export const TRANSLATIONS = {
   installed: { en: "App installed", es: "App instalada", fr: "Appli installée", de: "App installiert", pt: "App instalado" },
   installIos: { en: "On iPhone: tap Share, then Add to Home Screen.", es: "En iPhone: pulsa Compartir y luego Añadir a pantalla de inicio.", fr: "Sur iPhone : touchez Partager, puis Sur l’écran d’accueil.", de: "Auf dem iPhone: Teilen tippen, dann „Zum Home-Bildschirm“.", pt: "No iPhone: toque em Compartilhar e depois em Adicionar à Tela de Início." },
   offlineBanner: { en: "You are offline. Maps, routes and weather need a connection.", es: "Estás sin conexión. Los mapas, las rutas y el tiempo necesitan conexión.", fr: "Vous êtes hors ligne. Les cartes, itinéraires et la météo nécessitent une connexion.", de: "Du bist offline. Karten, Routen und Wetter brauchen eine Verbindung.", pt: "Você está offline. Mapas, rotas e clima precisam de conexão." },
+
+  // ---- Trip summary ----
+  sumStops: { en: "Stops reached", es: "Paradas alcanzadas", fr: "Étapes atteintes", de: "Erreichte Stopps", pt: "Paradas alcançadas" },
+  sumTime: { en: "Time", es: "Tiempo", fr: "Durée", de: "Dauer", pt: "Tempo" },
+  sumPoints: { en: "Points earned", es: "Puntos ganados", fr: "Points gagnés", de: "Verdiente Punkte", pt: "Pontos ganhos" },
+  sumPlan: { en: "Your stops", es: "Tus paradas", fr: "Vos étapes", de: "Deine Stopps", pt: "Suas paradas" },
+  sumEarly: { en: "{n} min early", es: "{n} min antes", fr: "{n} min d’avance", de: "{n} Min. früher", pt: "{n} min adiantado" },
+  sumOnTime: { en: "On time", es: "A tiempo", fr: "À l’heure", de: "Pünktlich", pt: "No horário" },
+  sumSkipped: { en: "Skipped", es: "Saltada", fr: "Passée", de: "Übersprungen", pt: "Pulada" },
+  sumNewBadges: { en: "New badges", es: "Nuevas insignias", fr: "Nouveaux badges", de: "Neue Abzeichen", pt: "Novas conquistas" },
+  sumNote: { en: "Distance is measured in a straight line between your stops.", es: "La distancia se mide en línea recta entre tus paradas.", fr: "La distance est mesurée en ligne droite entre vos étapes.", de: "Die Entfernung wird in Luftlinie zwischen deinen Stopps gemessen.", pt: "A distância é medida em linha reta entre as paradas." },
 } satisfies Record<string, Entry>;
